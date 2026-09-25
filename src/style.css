@@ -438,7 +438,7 @@ html, body {
 }
 
 
-/* Bottom Waypoint Dock - Stably anchored at viewport bottom */
+/* Bottom Waypoint Dock */
 .bottom-dock {
   align-self: center;
   display: flex;
@@ -446,22 +446,30 @@ html, body {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   backdrop-filter: blur(16px);
-  padding: 8px 12px;
+  -webkit-backdrop-filter: blur(16px);
+  padding: 8px 16px;
   border-radius: 40px;
   pointer-events: auto;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  margin-top: auto;
-  margin-bottom: clamp(6px, 1.4vh, 12px);
-  transform: none;
-  transition: all 0.3s ease;
+  margin-bottom: 12px;
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Neutralize legacy per-waypoint vertical shifts across all viewports */
-.bottom-dock.dock-pos-0,
-.bottom-dock.dock-pos-1,
-.bottom-dock.dock-pos-2,
+/* Per-Waypoint Dock Vertical Positioning */
+.bottom-dock.dock-pos-0 {
+  transform: translateY(260px); /* Summit: comfortably down in lower cliff zone, fully clearing cabin & rocks */
+}
+
+.bottom-dock.dock-pos-1 {
+  transform: translateY(210px); /* Cabin Deck: moved down below porch framing and railing view */
+}
+
+.bottom-dock.dock-pos-2 {
+  transform: translateY(-320px); /* Campfire: moved significantly upwards */
+}
+
 .bottom-dock.dock-pos-3 {
-  transform: none;
+  transform: translateY(320px); /* Signal Tower: moved further downwards as requested */
 }
 
 .dock-btn {
@@ -2721,10 +2729,11 @@ body.is-embedded .crt-content {
 }
 
 /* ==========================================================================
-   Small Laptop & Compact Desktop Screens (769px - 1440px or height <= 860px)
-   Adapts interface fluidly for 11"-14" laptops, 1366x768, 1280x720, scaled displays
+   Small Laptop & Compact Displays (width <= 1366px or height <= 800px)
+   Adapts interface fluidly for 11"-14" laptops, 1366x768, 1280x720, scaled displays.
+   Displays above this limit return to full desktop layout with dynamic dock positioning.
    ========================================================================== */
-@media (min-width: 769px) and (max-width: 1440px), (min-width: 769px) and (max-height: 860px) {
+@media (min-width: 769px) and (max-width: 1366px), (min-width: 769px) and (max-height: 800px) {
   /* Fluid UI Overlay Spacing */
   .ui-layer {
     padding: clamp(12px, 2vh, 20px) clamp(16px, 2.5vw, 28px);
