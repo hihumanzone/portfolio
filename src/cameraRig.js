@@ -195,13 +195,21 @@ export class CameraRig {
     });
   }
 
+  isMobileDevice() {
+    return typeof window !== 'undefined' && (
+      window.innerWidth <= 768 ||
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+      /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '')
+    );
+  }
+
   panSummit(deltaRadians) {
-    if (this.activeWaypointIndex !== 0 || this.isTransitioning) return;
+    if (this.activeWaypointIndex !== 0 || this.isTransitioning || !this.isMobileDevice()) return;
     this.summitPanTarget = Math.max(-0.55, Math.min(0.55, this.summitPanTarget + deltaRadians));
   }
 
   setSummitPanTarget(radians) {
-    if (this.activeWaypointIndex !== 0 || this.isTransitioning) return;
+    if (this.activeWaypointIndex !== 0 || this.isTransitioning || !this.isMobileDevice()) return;
     this.summitPanTarget = Math.max(-0.55, Math.min(0.55, radians));
   }
 
@@ -221,8 +229,8 @@ export class CameraRig {
     this.mouseCurrent.x += (this.mouseTarget.x - this.mouseCurrent.x) * alpha;
     this.mouseCurrent.y += (this.mouseTarget.y - this.mouseCurrent.y) * alpha;
 
-    // Smooth summit pan interpolation (only active at Summit when settled)
-    if (this.activeWaypointIndex === 0 && !this.isTransitioning) {
+    // Smooth summit pan interpolation (only active at Summit on mobile when settled)
+    if (this.activeWaypointIndex === 0 && !this.isTransitioning && this.isMobileDevice()) {
       const panSmoothing = 1 - Math.exp(-delta * 6.0);
       this.summitPanCurrent += (this.summitPanTarget - this.summitPanCurrent) * panSmoothing;
     } else {

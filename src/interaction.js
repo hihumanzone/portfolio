@@ -33,13 +33,6 @@ export class InteractionManager {
     this.touchStartTime = 0;
     this.isPanningSummit = false;
 
-    // Desktop Mouse Drag tracking
-    this.isMouseDown = false;
-    this.mouseStartX = 0;
-    this.mouseStartY = 0;
-    this.lastMouseX = 0;
-    this.mouseDragged = false;
-
     this.bindEvents();
   }
 
@@ -161,51 +154,11 @@ export class InteractionManager {
 
     this.domElement.addEventListener('click', (e) => {
       if (isPointerOverUI(e)) return;
-      if (this.mouseDragged) {
-        this.mouseDragged = false;
-        return;
-      }
       if (!this.hoveredTarget) return;
       this.performTargetInteraction(this.hoveredTarget);
     });
 
-    // Desktop Mouse Drag to pan panorama at Summit
-    this.domElement.addEventListener('mousedown', (e) => {
-      if (isPointerOverUI(e)) return;
-      this.isMouseDown = true;
-      this.mouseStartX = e.clientX;
-      this.mouseStartY = e.clientY;
-      this.lastMouseX = e.clientX;
-      this.mouseDragged = false;
-      if (this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.hoveredTarget) {
-        this.domElement.style.cursor = 'grabbing';
-      }
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (this.isMouseDown && this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.cameraRig.isTransitioning) {
-        const dx = e.clientX - this.lastMouseX;
-        if (Math.abs(e.clientX - this.mouseStartX) > 4) {
-          this.mouseDragged = true;
-          this.cameraRig.panSummit((dx / window.innerWidth) * 0.95);
-          this.lastMouseX = e.clientX;
-          if (this.onSummitPan) {
-            this.onSummitPan(this.cameraRig.getSummitPanRatio());
-          }
-        }
-      }
-    });
-
-    window.addEventListener('mouseup', () => {
-      if (this.isMouseDown) {
-        this.isMouseDown = false;
-        if (this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.hoveredTarget) {
-          this.domElement.style.cursor = 'grab';
-        }
-      }
-    });
-
-    // Touch Support: Tap detection for raycasting + Drag for Summit Panorama + Swipe for Waypoints
+    // Touch Support: Tap detection for raycasting + Mobile-only Drag for Summit Panorama + Swipe for Waypoints
     this.domElement.addEventListener('touchstart', (e) => {
       if (isPointerOverUI(e)) return;
       if (e.touches.length > 0) {
@@ -225,8 +178,9 @@ export class InteractionManager {
       const totalDistX = Math.abs(clientX - this.touchStartX);
       const totalDistY = Math.abs(clientY - this.touchStartY);
 
-      // In Summit Waypoint (index 0): horizontal drag pans the mountain & river panorama!
-      if (this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.cameraRig.isTransitioning) {
+      // In Summit Waypoint (index 0) on mobile phones: horizontal drag pans the mountain & river panorama!
+      const isMobile = this.cameraRig?.isMobileDevice ? this.cameraRig.isMobileDevice() : (window.innerWidth <= 768);
+      if (isMobile && this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.cameraRig.isTransitioning) {
         if (totalDistX > 6 && totalDistX > totalDistY * 0.7) {
           this.isPanningSummit = true;
           // Drag right pulls river onto screen from the left (+pan)

@@ -1156,6 +1156,12 @@ class App {
 
     if (this.cameraRig) {
       this.cameraRig.updateFov();
+      if (!isMobile) {
+        this.cameraRig.resetSummitPan();
+        if (soundscape && soundscape.setSummitPanMix) {
+          soundscape.setSummitPanMix(0);
+        }
+      }
     }
 
     this.renderer.setPixelRatio(pixelRatio);
