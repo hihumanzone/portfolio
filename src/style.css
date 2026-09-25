@@ -17,6 +17,32 @@
   user-select: none;
 }
 
+/* Sleek Cyber Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 188, 235, 0.35) rgba(7, 10, 20, 0.4);
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(7, 10, 20, 0.4);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(120, 188, 235, 0.3);
+  border-radius: 4px;
+  border: 1px solid rgba(120, 188, 235, 0.15);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}
+
 html, body {
   width: 100%;
   height: 100%;
@@ -122,7 +148,7 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 24px 32px;
+  padding: clamp(14px, 2vh, 24px) clamp(16px, 2.5vw, 32px);
 }
 
 /* Top Bar */
@@ -412,7 +438,7 @@ html, body {
 }
 
 
-/* Bottom Waypoint Dock */
+/* Bottom Waypoint Dock - Stably anchored at viewport bottom */
 .bottom-dock {
   align-self: center;
   display: flex;
@@ -424,25 +450,18 @@ html, body {
   border-radius: 40px;
   pointer-events: auto;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  margin-bottom: 12px;
-  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: auto;
+  margin-bottom: clamp(6px, 1.4vh, 12px);
+  transform: none;
+  transition: all 0.3s ease;
 }
 
-/* Per-Waypoint Dock Vertical Positioning */
-.bottom-dock.dock-pos-0 {
-  transform: translateY(260px); /* Summit: comfortably down in lower cliff zone, fully clearing cabin & rocks */
-}
-
-.bottom-dock.dock-pos-1 {
-  transform: translateY(210px); /* Cabin Deck: moved down below porch framing and railing view */
-}
-
-.bottom-dock.dock-pos-2 {
-  transform: translateY(-320px); /* Campfire: moved significantly upwards */
-}
-
+/* Neutralize legacy per-waypoint vertical shifts across all viewports */
+.bottom-dock.dock-pos-0,
+.bottom-dock.dock-pos-1,
+.bottom-dock.dock-pos-2,
 .bottom-dock.dock-pos-3 {
-  transform: translateY(320px); /* Signal Tower: moved further downwards as requested */
+  transform: none;
 }
 
 .dock-btn {
@@ -2590,6 +2609,348 @@ html, body {
   background: var(--accent-cyan);
   color: #070a14;
   font-weight: 600;
+}
+
+/* ==========================================================================
+   Embedded Retro Monitor Mode (inside 3D CRT Viewport @ 1024x768)
+   ========================================================================== */
+body.is-embedded {
+  font-size: 15px;
+}
+
+body.is-embedded .ui-layer {
+  padding: 16px 20px;
+}
+
+body.is-embedded .brand-name {
+  font-size: 1.22rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 12px rgba(120, 188, 235, 0.45);
+}
+
+body.is-embedded .brand-tag {
+  font-size: 0.78rem;
+  padding: 2px 8px;
+}
+
+body.is-embedded .brand-role {
+  font-size: 0.74rem;
+  color: var(--accent-cyan);
+}
+
+body.is-embedded .hud-btn {
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-color: rgba(120, 188, 235, 0.35);
+}
+
+body.is-embedded .audio-volume-panel {
+  padding: 6px 12px;
+  gap: 8px;
+}
+
+body.is-embedded .hud-volume-slider {
+  width: 70px;
+}
+
+body.is-embedded .bottom-dock,
+body.is-embedded .bottom-dock.dock-pos-0,
+body.is-embedded .bottom-dock.dock-pos-1,
+body.is-embedded .bottom-dock.dock-pos-2,
+body.is-embedded .bottom-dock.dock-pos-3 {
+  padding: 8px 14px;
+  gap: 8px;
+  border-radius: 30px;
+  background: rgba(10, 16, 30, 0.88);
+  border: 1px solid rgba(120, 188, 235, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 16px rgba(120, 188, 235, 0.15);
+  margin-top: auto !important;
+  margin-bottom: 8px !important;
+  transform: none !important;
+}
+
+body.is-embedded .dock-btn {
+  padding: 9px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  gap: 8px;
+  border-radius: 20px;
+}
+
+body.is-embedded .dock-btn .btn-index {
+  font-size: 0.74rem;
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+body.is-embedded .dock-btn.active {
+  background: rgba(120, 188, 235, 0.22);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 14px rgba(120, 188, 235, 0.35);
+  color: #fff;
+}
+
+body.is-embedded .interaction-hint {
+  font-size: 0.72rem;
+  color: #a4b8db;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  margin-bottom: 2px;
+}
+
+body.is-embedded .crt-chassis,
+body.is-embedded .journal-chassis,
+body.is-embedded .comms-chassis,
+body.is-embedded .inspector-chassis {
+  width: 96%;
+  height: 94%;
+  max-height: 94%;
+}
+
+body.is-embedded .stage-viewport-wrapper {
+  height: 275px;
+}
+
+body.is-embedded .stage-focus-summary {
+  padding: 12px 16px;
+  margin-top: 8px;
+}
+
+body.is-embedded .crt-content {
+  padding: 14px 18px;
+}
+
+/* ==========================================================================
+   Small Laptop & Compact Desktop Screens (769px - 1440px or height <= 860px)
+   Adapts interface fluidly for 11"-14" laptops, 1366x768, 1280x720, scaled displays
+   ========================================================================== */
+@media (min-width: 769px) and (max-width: 1440px), (min-width: 769px) and (max-height: 860px) {
+  /* Fluid UI Overlay Spacing */
+  .ui-layer {
+    padding: clamp(12px, 2vh, 20px) clamp(16px, 2.5vw, 28px);
+  }
+
+  .brand-name {
+    font-size: clamp(1.02rem, 1.25vw, 1.18rem);
+  }
+
+  .brand-tag {
+    font-size: 0.72rem;
+  }
+
+  .brand-role {
+    font-size: 0.68rem;
+  }
+
+  .hud-btn {
+    padding: 7px 12px;
+    font-size: 0.74rem;
+  }
+
+  .audio-volume-panel {
+    padding: 5px 10px;
+    gap: 6px;
+  }
+
+  .hud-volume-slider {
+    width: 62px;
+  }
+
+  /* Waypoint Navigation Dock - Responsive & Anchored */
+  .bottom-dock,
+  .bottom-dock.dock-pos-0,
+  .bottom-dock.dock-pos-1,
+  .bottom-dock.dock-pos-2,
+  .bottom-dock.dock-pos-3 {
+    padding: 6px 10px;
+    gap: 8px;
+    margin-top: auto !important;
+    margin-bottom: clamp(6px, 1.2vh, 10px) !important;
+    transform: none !important;
+  }
+
+  .dock-btn {
+    padding: 8px 14px;
+    font-size: clamp(0.72rem, 0.95vw, 0.78rem);
+    gap: 6px;
+  }
+
+  .dock-btn .btn-index {
+    font-size: 0.7rem;
+  }
+
+  .interaction-hint {
+    font-size: clamp(0.65rem, 0.85vw, 0.72rem);
+    margin-bottom: 2px;
+  }
+
+  /* Adaptive Modals for Laptop Viewports */
+  .crt-chassis,
+  .journal-chassis,
+  .comms-chassis,
+  .inspector-chassis {
+    width: min(94vw, 1080px);
+    height: min(92vh, 760px);
+    max-height: 92vh;
+    border-radius: 10px;
+  }
+
+  .crt-header,
+  .journal-header,
+  .comms-header {
+    padding: 10px 16px;
+  }
+
+  .crt-tabs {
+    padding: 8px 16px;
+    gap: 6px;
+  }
+
+  .tab-btn {
+    padding: 6px 12px;
+    font-size: 0.74rem;
+  }
+
+  .crt-content {
+    padding: clamp(12px, 2vh, 18px);
+  }
+
+  .showcase-toolbar {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .project-search-input {
+    padding: 8px 12px 8px 34px;
+    font-size: 0.78rem;
+  }
+
+  /* Compact 3D stage allows stage + focus card to fit without forced scrolling */
+  .stage-viewport-wrapper {
+    height: clamp(230px, 33vh, 320px);
+  }
+
+  .stage-nav-cluster {
+    bottom: 8px;
+    padding: 4px 10px;
+    gap: 8px;
+  }
+
+  .stage-nav-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+
+  .stage-project-indicator {
+    font-size: 0.74rem;
+  }
+
+  .stage-focus-summary {
+    padding: 12px 16px;
+    margin-top: 8px;
+    border-radius: 8px;
+  }
+
+  .focus-title {
+    font-size: 1.15rem;
+    margin-bottom: 4px;
+  }
+
+  .focus-desc {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+
+  .focus-tag {
+    padding: 2px 7px;
+    font-size: 0.68rem;
+  }
+
+  .stage-inspect-btn,
+  .stage-repo-link {
+    padding: 6px 12px;
+    font-size: 0.72rem;
+  }
+
+  .skills-wrapper {
+    gap: 16px;
+  }
+
+  .skill-category {
+    padding: 16px;
+  }
+
+  .cli-container {
+    height: 100%;
+  }
+
+  .journal-content {
+    padding: 18px 22px;
+  }
+
+  .journal-title {
+    font-size: 1.3rem;
+    margin-bottom: 4px;
+  }
+
+  .journal-meta {
+    font-size: 0.7rem;
+    margin-bottom: 16px;
+  }
+
+  .journal-entry {
+    margin-bottom: 16px;
+  }
+
+  .journal-entry h3 {
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+
+  .journal-entry p {
+    font-size: 0.86rem;
+    line-height: 1.55;
+  }
+
+  .journal-footer {
+    margin-top: 18px;
+    padding-top: 12px;
+  }
+
+  .comms-body {
+    padding: 18px 22px;
+  }
+
+  .comms-sub {
+    font-size: 0.84rem;
+    margin-bottom: 16px;
+  }
+
+  .channel-card {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .channel-value {
+    font-size: 0.8rem;
+  }
+
+  .copy-btn,
+  .dispatch-link {
+    padding: 6px 12px;
+    font-size: 0.72rem;
+  }
+
+  .inspector-body {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .inspector-img {
+    max-height: 280px;
+  }
 }
 
 /* ==========================================================================

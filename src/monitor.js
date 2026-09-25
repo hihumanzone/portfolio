@@ -984,10 +984,10 @@ class RetroWorkspaceApp {
     const screenEl = document.createElement('div');
     screenEl.className = 'screen-3d-viewport';
 
-    // 2. Iframe loading portfolio.html (untouched website)
+    // 2. Iframe loading portfolio.html (embedded mode)
     const iframe = document.createElement('iframe');
     iframe.id = 'portfolio-frame';
-    iframe.src = 'portfolio.html';
+    iframe.src = 'portfolio.html?embedded=true';
     iframe.title = 'Riddhiman Kundal Portfolio';
     iframe.allow = 'autoplay';
     iframe.loading = 'eager';
@@ -1008,8 +1008,8 @@ class RetroWorkspaceApp {
 
     // 4. Wrap in CSS3DObject
     this.screenObject = new CSS3DObject(screenEl);
-    // Scale 1440x1080 display down to exact 1024x768 3D bezel dimensions
-    this.screenObject.scale.set(1024 / 1440, 768 / 1080, 1);
+    // 1:1 scale for exact 1024x768 3D bezel dimensions
+    this.screenObject.scale.set(1, 1, 1);
     // Align screen with monitor tilt and position in 3D space
     const screenLocalPos = new THREE.Vector3(0, 500, 14);
     screenLocalPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.monitorGroup.rotation.x);
@@ -1329,8 +1329,17 @@ class RetroWorkspaceApp {
       // Narrow screens (mobile portrait / square): widen vertical FOV so full monitor & table remain in view
       const fovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (targetAspect / aspect));
       this.camera.fov = (fovRad * 180) / Math.PI;
+      this.camera.position.set(-115, 390, 1680);
     } else {
-      // Wide screens (desktop landscape): use standard cinematic FOV
+      // Wide screens (desktop & laptop landscape): adaptive camera distance for smaller laptop screens
+      // On compact laptop screens (height <= 850px), smoothly adjust camera closer so the monitor is larger
+      // and much more readable, while keeping the wooden desk and bezel buttons in clear, comfortable view.
+      const heightProgress = THREE.MathUtils.clamp((height - 580) / 340, 0, 1);
+      const camZ = THREE.MathUtils.lerp(1550, 1680, heightProgress);
+      const camY = THREE.MathUtils.lerp(410, 390, heightProgress);
+      const camX = THREE.MathUtils.lerp(-95, -115, heightProgress);
+
+      this.camera.position.set(camX, camY, camZ);
       this.camera.fov = baseFov;
     }
 

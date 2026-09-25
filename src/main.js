@@ -403,10 +403,17 @@ class App {
       });
     });
 
+    // Embedded Mode Detection (for 3D Retro Monitor iframe)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isEmbedded = window.self !== window.top || urlParams.get('embedded') === 'true';
+    if (isEmbedded) {
+      document.body.classList.add('is-embedded');
+      document.documentElement.classList.add('is-embedded');
+    }
+
     // Retro Workstation Switcher for Desktop Visitors
     const retroBtn = document.getElementById('retro-switch-btn');
     if (retroBtn) {
-      const isEmbedded = window.self !== window.top;
       const isMobile = window.innerWidth <= 768 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
       if (!isEmbedded && !isMobile) {
         retroBtn.classList.remove('hidden');
