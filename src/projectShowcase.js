@@ -663,7 +663,8 @@ export class ProjectShowcase {
       const onPointerDown = e => {
         this.isDragging = true;
         updateCanvasRect();
-        const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+        const touch = e.touches && e.touches[0];
+        const clientX = touch ? touch.clientX : (typeof e.clientX === 'number' ? e.clientX : 0);
         this.dragStartX = clientX;
         this.lastPointerX = clientX;
         this.lastPointerTime = performance.now();
@@ -674,8 +675,9 @@ export class ProjectShowcase {
       };
 
       const onPointerMove = e => {
-        const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
-        const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+        const touch = e.touches && e.touches[0];
+        const clientX = touch ? touch.clientX : (typeof e.clientX === 'number' ? e.clientX : 0);
+        const clientY = touch ? touch.clientY : (typeof e.clientY === 'number' ? e.clientY : 0);
         const now = performance.now();
 
         if (!this.canvasRect) updateCanvasRect();
@@ -722,7 +724,7 @@ export class ProjectShowcase {
 
       this.canvas.addEventListener('touchstart', onPointerDown, { passive: true });
       window.addEventListener('touchmove', onPointerMove, { passive: true });
-      window.addEventListener('touchend', onPointerUp);
+      window.addEventListener('touchend', onPointerUp, { passive: true });
 
       // Mouse Wheel Navigation
       this.canvas.addEventListener('wheel', e => {
@@ -798,8 +800,21 @@ export class ProjectShowcase {
 
     this.canvasRect = this.canvas.getBoundingClientRect();
     this.camera.aspect = width / height;
+
+    if (width < 640) {
+      this.camera.fov = 44;
+      this.camera.position.z = 10.4;
+    } else {
+      this.camera.fov = 38;
+      this.camera.position.z = 9.4;
+    }
+
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+  }
+
+  onResize() {
+    this.handleResize();
   }
 
   /* -------------------------------------------------------------------------- */

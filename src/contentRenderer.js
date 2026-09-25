@@ -37,10 +37,15 @@ export function renderPortfolioContent(content) {
 
   // 4. Waypoint Dock & Hint
   if (content.navigation) {
-    const hintEl = document.querySelector('.interaction-hint span');
-    if (hintEl && content.navigation.hint) {
-      hintEl.textContent = content.navigation.hint;
+    const hintDesktop = document.querySelector('.interaction-hint .hint-desktop') || document.querySelector('.interaction-hint span');
+    if (hintDesktop && content.navigation.hint) {
+      hintDesktop.textContent = content.navigation.hint;
     }
+
+    const shortWaypointNames = {
+      'CABIN DESK': 'CABIN',
+      'SIGNAL TOWER': 'TOWER'
+    };
 
     if (Array.isArray(content.navigation.waypoints)) {
       const dockNav = document.querySelector('.bottom-dock');
@@ -51,9 +56,14 @@ export function renderPortfolioContent(content) {
           const btn = document.createElement('button');
           btn.className = `dock-btn ${idx === 0 ? 'active' : ''}`;
           btn.setAttribute('data-waypoint', String(wp.id ?? idx));
+          const name = wp.name || '';
+          const shortName = wp.shortName || shortWaypointNames[name] || name;
           btn.innerHTML = `
             <span class="btn-index">${wp.code || `0${idx + 1}`}</span>
-            <span class="btn-title">${wp.name || ''}</span>
+            <span class="btn-title">
+              <span class="title-full">${name}</span>
+              <span class="title-short">${shortName}</span>
+            </span>
           `;
           dockNav.appendChild(btn);
         });
@@ -68,6 +78,12 @@ export function renderPortfolioContent(content) {
       termTitle.textContent = content.workstation.title;
     }
 
+    const shortTabLabels = {
+      '01_PROJECTS': 'PROJECTS',
+      '02_TECH_MATRIX': 'SKILLS',
+      '03_INTERACTIVE_CLI': 'CLI'
+    };
+
     // Tabs
     if (Array.isArray(content.workstation.tabs)) {
       const tabsNav = document.querySelector('.crt-tabs');
@@ -77,7 +93,11 @@ export function renderPortfolioContent(content) {
           const btn = document.createElement('button');
           btn.className = `tab-btn ${idx === 0 ? 'active' : ''}`;
           btn.setAttribute('data-tab', tab.id);
-          btn.textContent = tab.label;
+          const short = shortTabLabels[tab.label] || tab.label.replace(/^\d+_/, '');
+          btn.innerHTML = `
+            <span class="tab-label-full">${tab.label}</span>
+            <span class="tab-label-short">${short}</span>
+          `;
           tabsNav.appendChild(btn);
         });
       }

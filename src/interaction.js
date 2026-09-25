@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 
 export class InteractionManager {
-  constructor(scene, camera, domElement, cameraRig, onOpenModal, onSwitchWaypoint) {
+  constructor(scene, camera, domElement, cameraRig, onOpenModal, onSwitchWaypoint, onSummitPan) {
     this.scene = scene;
     this.camera = camera;
     this.domElement = domElement;
     this.cameraRig = cameraRig;
     this.onOpenModal = onOpenModal;
     this.onSwitchWaypoint = onSwitchWaypoint;
+    this.onSummitPan = onSummitPan;
 
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2(-999, -999);
@@ -24,7 +25,20 @@ export class InteractionManager {
     this._lastTooltipY = 0;
     this._pendingMouseX = 0;
     this._pendingMouseY = 0;
-    this._hasPendingMouse = false;
+
+    // Touch & Panorama Drag tracking
+    this.touchStartX = 0;
+    this.touchStartY = 0;
+    this.lastTouchX = 0;
+    this.touchStartTime = 0;
+    this.isPanningSummit = false;
+
+    // Desktop Mouse Drag tracking
+    this.isMouseDown = false;
+    this.mouseStartX = 0;
+    this.mouseStartY = 0;
+    this.lastMouseX = 0;
+    this.mouseDragged = false;
 
     this.bindEvents();
   }
@@ -39,6 +53,55 @@ export class InteractionManager {
     
     this.interactiveTargets.push(object);
     this.raycastColliders.push(collider);
+  }
+
+  performTargetInteraction(target) {
+    if (!target) return;
+    const { waypointIndex, modalId, onClick } = target.userData;
+
+    if (typeof onClick === 'function') {
+      onClick();
+    }
+
+    if (typeof waypointIndex === 'number') {
+      if (this.onSwitchWaypoint) {
+        this.onSwitchWaypoint(waypointIndex);
+      } else if (this.cameraRig) {
+        this.cameraRig.goToWaypoint(waypointIndex);
+      }
+    }
+
+    if (modalId && this.onOpenModal) {
+      setTimeout(() => {
+        this.onOpenModal(modalId);
+      }, 350);
+    }
+  }
+
+  findInteractiveObjectAt(normalizedPoint) {
+    this.raycaster.setFromCamera(normalizedPoint, this.camera);
+    const targetsToTest = this.raycastColliders.length ? this.raycastColliders : this.interactiveTargets;
+    const intersects = this.raycaster.intersectObjects(targetsToTest, true);
+
+    if (intersects.length > 0) {
+      let targetInteractive = null;
+      for (let i = 0; i < intersects.length; i++) {
+        let obj = intersects[i].object;
+        while (obj && !obj.userData.isInteractive && obj.parent) {
+          obj = obj.parent;
+        }
+        if (obj && obj.userData.isInteractive) {
+          if (obj.userData.id === 'signalTower') {
+            return obj;
+          }
+          if (!targetInteractive) {
+            targetInteractive = obj;
+          }
+        }
+      }
+      return targetInteractive;
+    }
+    return null;
   }
 
   bindEvents() {
@@ -96,29 +159,147 @@ export class InteractionManager {
       }
     });
 
-    this.domElement.addEventListener('click', () => {
-      if (this.isOverUI || !this.hoveredTarget) return;
+    this.domElement.addEventListener('click', (e) => {
+      if (isPointerOverUI(e)) return;
+      if (this.mouseDragged) {
+        this.mouseDragged = false;
+        return;
+      }
+      if (!this.hoveredTarget) return;
+      this.performTargetInteraction(this.hoveredTarget);
+    });
 
-      const { waypointIndex, modalId, onClick } = this.hoveredTarget.userData;
-      
-      if (typeof onClick === 'function') {
-        onClick();
+    // Desktop Mouse Drag to pan panorama at Summit
+    this.domElement.addEventListener('mousedown', (e) => {
+      if (isPointerOverUI(e)) return;
+      this.isMouseDown = true;
+      this.mouseStartX = e.clientX;
+      this.mouseStartY = e.clientY;
+      this.lastMouseX = e.clientX;
+      this.mouseDragged = false;
+      if (this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.hoveredTarget) {
+        this.domElement.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (this.isMouseDown && this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.cameraRig.isTransitioning) {
+        const dx = e.clientX - this.lastMouseX;
+        if (Math.abs(e.clientX - this.mouseStartX) > 4) {
+          this.mouseDragged = true;
+          this.cameraRig.panSummit((dx / window.innerWidth) * 0.95);
+          this.lastMouseX = e.clientX;
+          if (this.onSummitPan) {
+            this.onSummitPan(this.cameraRig.getSummitPanRatio());
+          }
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (this.isMouseDown) {
+        this.isMouseDown = false;
+        if (this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.hoveredTarget) {
+          this.domElement.style.cursor = 'grab';
+        }
+      }
+    });
+
+    // Touch Support: Tap detection for raycasting + Drag for Summit Panorama + Swipe for Waypoints
+    this.domElement.addEventListener('touchstart', (e) => {
+      if (isPointerOverUI(e)) return;
+      if (e.touches.length > 0) {
+        this.touchStartX = e.touches[0].clientX;
+        this.touchStartY = e.touches[0].clientY;
+        this.lastTouchX = this.touchStartX;
+        this.isPanningSummit = false;
+        this.touchStartTime = Date.now();
+      }
+    }, { passive: true });
+
+    this.domElement.addEventListener('touchmove', (e) => {
+      if (isPointerOverUI(e) || !e.touches.length) return;
+      const clientX = e.touches[0].clientX;
+      const clientY = e.touches[0].clientY;
+      const deltaX = clientX - this.lastTouchX;
+      const totalDistX = Math.abs(clientX - this.touchStartX);
+      const totalDistY = Math.abs(clientY - this.touchStartY);
+
+      // In Summit Waypoint (index 0): horizontal drag pans the mountain & river panorama!
+      if (this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.cameraRig.isTransitioning) {
+        if (totalDistX > 6 && totalDistX > totalDistY * 0.7) {
+          this.isPanningSummit = true;
+          // Drag right pulls river onto screen from the left (+pan)
+          // Drag left pulls mountain peaks onto screen from the right (-pan)
+          const sensitivity = (deltaX / window.innerWidth) * 0.95;
+          this.cameraRig.panSummit(sensitivity);
+          this.lastTouchX = clientX;
+          if (this.onSummitPan) {
+            this.onSummitPan(this.cameraRig.getSummitPanRatio());
+          }
+        }
+      }
+    }, { passive: true });
+
+    this.domElement.addEventListener('touchend', (e) => {
+      if (isPointerOverUI(e)) return;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+
+      if (this.cameraRig && this.cameraRig.isTransitioning) return;
+
+      if (this.isPanningSummit) {
+        this.isPanningSummit = false;
+        return; // Prevent tap or waypoint switch when panning panorama
       }
 
-      if (typeof waypointIndex === 'number') {
-        if (this.onSwitchWaypoint) {
-          this.onSwitchWaypoint(waypointIndex);
-        } else if (this.cameraRig) {
-          this.cameraRig.goToWaypoint(waypointIndex);
+      const deltaX = touch.clientX - this.touchStartX;
+      const deltaY = touch.clientY - this.touchStartY;
+      const dist = Math.hypot(deltaX, deltaY);
+      const elapsed = Date.now() - this.touchStartTime;
+
+      // 1. Horizontal Swipe Gesture -> Switch waypoints when NOT in summit panorama mode
+      if (this.cameraRig && this.cameraRig.activeWaypointIndex !== 0) {
+        if (dist > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3 && elapsed < 650) {
+          const totalWaypoints = this.cameraRig.waypoints.length;
+          const currentIdx = this.cameraRig.activeWaypointIndex;
+          if (deltaX < 0) {
+            // Swipe left -> advance to next waypoint
+            const nextIdx = (currentIdx + 1) % totalWaypoints;
+            if (this.onSwitchWaypoint) this.onSwitchWaypoint(nextIdx);
+            else this.cameraRig.goToWaypoint(nextIdx);
+          } else {
+            // Swipe right -> return to previous waypoint
+            const prevIdx = (currentIdx - 1 + totalWaypoints) % totalWaypoints;
+            if (this.onSwitchWaypoint) this.onSwitchWaypoint(prevIdx);
+            else this.cameraRig.goToWaypoint(prevIdx);
+          }
+          return;
         }
       }
 
-      if (modalId && this.onOpenModal) {
-        setTimeout(() => {
-          this.onOpenModal(modalId);
-        }, 350);
+      // 2. Clean Tap Gesture (< 16px movement) -> Raycast touch coordinates
+      if (dist < 16 && elapsed < 450) {
+        const touchPoint = new THREE.Vector2(
+          (touch.clientX / window.innerWidth) * 2 - 1,
+          -(touch.clientY / window.innerHeight) * 2 + 1
+        );
+        const hitTarget = this.findInteractiveObjectAt(touchPoint);
+        if (hitTarget) {
+          // Brief mobile visual feedback: position tooltip at tap
+          if (this.tooltipEl && this.tooltipText) {
+            this.tooltipText.textContent = hitTarget.userData.label || 'Opening...';
+            this.tooltipEl.style.left = `${touch.clientX}px`;
+            this.tooltipEl.style.top = `${touch.clientY}px`;
+            this.tooltipEl.classList.remove('hidden');
+            setTimeout(() => {
+              if (this.tooltipEl) this.tooltipEl.classList.add('hidden');
+            }, 800);
+          }
+          this.performTargetInteraction(hitTarget);
+        }
       }
-    });
+    }, { passive: true });
   }
 
   update() {

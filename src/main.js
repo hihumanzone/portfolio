@@ -80,13 +80,14 @@ class App {
   }
 
   initRenderer() {
+    const isMobile = window.innerWidth <= 768 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -177,7 +178,8 @@ class App {
       this.canvas,
       this.cameraRig,
       (modalId) => this.openModal(modalId),
-      (wpIdx) => this.switchWaypoint(wpIdx)
+      (wpIdx) => this.switchWaypoint(wpIdx),
+      (panRatio) => soundscape?.setSummitPanMix?.(panRatio)
     );
 
     if (this.cabin && this.cabin.signalTower) {
@@ -303,7 +305,15 @@ class App {
     // Bottom Dock navigation
     dockButtons.forEach((btn, index) => {
       btn.addEventListener('click', () => {
-        if (btn.classList.contains('active')) return;
+        if (btn.classList.contains('active')) {
+          if (index === 0 && this.cameraRig) {
+            this.cameraRig.resetSummitPan();
+            if (soundscape && soundscape.setSummitPanMix) {
+              soundscape.setSummitPanMix(0);
+            }
+          }
+          return;
+        }
         soundscape.playKeyClick();
         this.switchWaypoint(index);
       });
@@ -387,10 +397,21 @@ class App {
 
         if (targetTab === 'cli') {
           const cliInput = document.getElementById('cli-input');
-          if (cliInput) setTimeout(() => cliInput.focus(), 80);
+          const isMobile = window.innerWidth <= 768 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+          if (cliInput && !isMobile) setTimeout(() => cliInput.focus(), 80);
         }
       });
     });
+
+    // Retro Workstation Switcher for Desktop Visitors
+    const retroBtn = document.getElementById('retro-switch-btn');
+    if (retroBtn) {
+      const isEmbedded = window.self !== window.top;
+      const isMobile = window.innerWidth <= 768 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+      if (!isEmbedded && !isMobile) {
+        retroBtn.classList.remove('hidden');
+      }
+    }
 
     // One-Click Copy Buttons (cached)
     this.dom.copyButtons.forEach(btn => {
@@ -1092,15 +1113,50 @@ class App {
       scrollToBottom();
     });
 
-    history.addEventListener('click', () => input.focus());
+    // Mobile quick command toolbar support
+    const quickBar = document.getElementById('cli-quick-bar');
+    if (quickBar) {
+      quickBar.addEventListener('click', (e) => {
+        const chip = e.target.closest('.cli-chip');
+        if (!chip) return;
+        const cmd = chip.getAttribute('data-cmd');
+        if (!cmd) return;
+
+        if (typeof soundscape.playTerminalBeep === 'function') soundscape.playTerminalBeep(980);
+
+        const echoLine = document.createElement('div');
+        echoLine.className = 'cli-line cmd-echo';
+        echoLine.innerHTML = `<span class="cli-prompt">${promptText}</span> <span class="cmd-amber">${encodeEntities(cmd)}</span>`;
+        history.appendChild(echoLine);
+
+        commandHistory.push(cmd);
+        if (commandHistory.length > 80) commandHistory.shift();
+        historyIdx = commandHistory.length;
+        draft = '';
+        persistHistory();
+
+        execute(cmd);
+        scrollToBottom();
+      });
+    }
+
+    history.addEventListener('click', () => {
+      const isMobile = window.innerWidth <= 768 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      if (!isMobile) input.focus();
+    });
   }
 
   onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pixelRatio = Math.min(window.devicePixelRatio, 2);
+    const isMobile = w <= 768 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+
+    if (this.cameraRig) {
+      this.cameraRig.updateFov();
+    }
 
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(w, h);
@@ -1110,9 +1166,17 @@ class App {
     this.composer.setSize(w, h);
 
     if (this.bloomPass) {
-      const bloomW = Math.max(256, Math.floor(w / 2));
-      const bloomH = Math.max(256, Math.floor(h / 2));
+      const bloomW = Math.max(256, Math.floor(w / (isMobile ? 3 : 2)));
+      const bloomH = Math.max(256, Math.floor(h / (isMobile ? 3 : 2)));
       this.bloomPass.resolution.set(bloomW, bloomH);
+    }
+
+    if (projectShowcaseInstance) {
+      if (typeof projectShowcaseInstance.handleResize === 'function') {
+        projectShowcaseInstance.handleResize();
+      } else if (typeof projectShowcaseInstance.onResize === 'function') {
+        projectShowcaseInstance.onResize();
+      }
     }
   }
 

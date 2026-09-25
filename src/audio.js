@@ -611,6 +611,32 @@ class AmbientSoundscape {
   }
 
   /**
+   * Dynamically modulates ambient balance based on panoramic look direction at the Summit waypoint.
+   * @param {number} panRatio - Normalized horizontal pan from -1.0 (right, mountains) to +1.0 (left, river/valley)
+   */
+  setSummitPanMix(panRatio = 0, rampTime = 0.15) {
+    if (!this.ctx || this.currentWaypoint !== 0) return;
+    const clamped = Math.max(-1, Math.min(1, panRatio));
+
+    // Waypoint 0 base mix: wind=0.46, river=0.34, fire=0.50, cricket=0.42
+    // Looking Left (positive clamped -> river):
+    // River rises up to +42% (0.34 -> 0.48), wind softens slightly (-15%)
+    // Looking Right (negative clamped -> mountain ridge):
+    // Wind gusts rise up to +35% (0.46 -> 0.62), river softens (-40%)
+    const riverMod = clamped > 0 ? (1 + clamped * 0.42) : (1 + clamped * 0.45);
+    const windMod = clamped < 0 ? (1 - clamped * 0.35) : (1 - clamped * 0.15);
+    const fireMod = 1 - Math.abs(clamped) * 0.18;
+
+    const windTarget = Math.max(0.05, 0.46 * windMod * this.windLevel);
+    const riverTarget = Math.max(0.05, 0.34 * riverMod * this.riverLevel);
+    const fireTarget = Math.max(0.05, 0.50 * fireMod * this.fireLevel);
+
+    this.rampGain(this.windGain, windTarget, rampTime);
+    this.rampGain(this.riverGain, riverTarget, rampTime);
+    this.rampGain(this.fireGain, fireTarget, rampTime);
+  }
+
+  /**
    * Sets an individual ambient layer's balance level (0.0 to 1.0).
    * Valid keys: 'wind' | 'river' | 'fire' | 'cricket'
    * Re-applies the current waypoint mix so the change is heard immediately.
