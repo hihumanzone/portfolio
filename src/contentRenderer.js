@@ -149,6 +149,21 @@ export function renderPortfolioContent(content) {
       if (cliPrompt && content.workstation.cli.prompt) {
         cliPrompt.textContent = content.workstation.cli.prompt;
       }
+
+      // Mobile quick command toolbar
+      const quickBar = document.getElementById('cli-quick-bar');
+      if (quickBar && Array.isArray(content.workstation.cli.quickCommands)) {
+        quickBar.innerHTML = '';
+        content.workstation.cli.quickCommands.forEach((qc) => {
+          if (!qc || !qc.cmd) return;
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'cli-chip';
+          chip.setAttribute('data-cmd', qc.cmd);
+          chip.textContent = qc.label || qc.cmd;
+          quickBar.appendChild(chip);
+        });
+      }
     }
   }
 

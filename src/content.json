@@ -552,10 +552,326 @@
       }
     ],
     "cli": {
-      "banner": "Welcome to RiddhimanOS Terminal (timber-cabin)",
+      "banner": "Welcome to RiddhimanOS Terminal !! :]",
       "hint": "Type <span class=\"cmd-highlight\">help</span> to view available system commands.",
       "prompt": "guest@cabin:~$",
-      "whoami": "guest@riddhiman-cabin (visitor | read-only terminal access) </3"
+      "whoami": "guest@riddhiman-cabin (visitor | read-only terminal access) </3",
+      "quickCommands": [
+        { "cmd": "help", "label": "help" },
+        { "cmd": "projects", "label": "projects" },
+        { "cmd": "skills", "label": "skills" },
+        { "cmd": "contact", "label": "contact" },
+        { "cmd": "clear", "label": "clear" }
+      ],
+      "modules": [
+        { "name": "projects", "desc": "01_PROJECTS • 3D Holo-Deck showcase" },
+        { "name": "skills", "desc": "02_TECH_MATRIX • capability matrix" },
+        { "name": "cli", "desc": "03_INTERACTIVE_CLI • you are here" },
+        { "name": "journal", "desc": "CAMPFIRE LOG • engineering journal" },
+        { "name": "comms", "desc": "TRANSMISSION ARRAY • contact console" }
+      ],
+      "templates": {
+        "commandDetail": [
+          { "text": "<span class=\"cmd-cyan\">{cmd}</span> — <span class=\"dim\">{desc}</span>" },
+          { "text": "  <span class=\"cmd-highlight\">usage:</span>  <span class=\"dim\">{usage}</span>" },
+          { "if": "example", "text": "  <span class=\"cmd-highlight\">example:</span> <span class=\"cmd-amber\">{example}</span>" },
+          {
+            "if": "aliases",
+            "text": "  <span class=\"dim\">aliases:</span> {aliases}",
+            "list": { "field": "aliases", "item": "<span class=\"cmd-name\">{item}</span>", "sep": " " }
+          }
+        ],
+        "projectNotFound": [
+          { "text": "<span class=\"error\">No project matches '{arg}'.</span>" },
+          { "text": "  <span class=\"dim\">Try <span class=\"cmd-highlight\">projects</span> to list all repositories.</span>" }
+        ],
+        "openMissingArg": [
+          { "text": "<span class=\"error\">No project matches '{arg}'.</span>" },
+          { "text": "  <span class=\"dim\">usage: {usage} •</span> e.g. <span class=\"cmd-amber\">{example}</span>" }
+        ],
+        "projectDetail": [
+          { "type": "rule" },
+          { "text": "<span class=\"cmd-id\">{id}</span> <span class=\"cmd-cyan\">{name}</span> <span class=\"dim\">{categoryLabel}</span>" },
+          { "if": "badge", "text": "  <span class=\"cmd-amber\">{badge}</span>" },
+          { "if": "stats", "text": "  <span class=\"dim\">language:</span> <span class=\"cmd-amber\">{stats.language}</span> <span class=\"dim\">• stars:</span> <span class=\"cmd-amber\">{stats.stars}</span> <span class=\"dim\">• forks:</span> <span class=\"cmd-amber\">{stats.forks}</span>" },
+          { "type": "blank" },
+          { "if": "description", "text": "  {description}" },
+          {
+            "if": "tags",
+            "text": "  <span class=\"dim\">stack:</span> {tags}",
+            "list": { "field": "tags", "item": "<span class=\"cmd-tag\">{item}</span>", "sep": " " }
+          },
+          { "type": "blank" },
+          { "if": "features", "text": "  <span class=\"cmd-cyan\">▸ KEY FEATURES</span>" },
+          { "if": "features", "loop": "features", "text": "    <span class=\"dim\">•</span> {item}" },
+          { "if": "architecture", "text": "  <span class=\"cmd-cyan\">▸ ARCHITECTURE</span>" },
+          { "if": "architecture", "loop": "architecture", "text": "    <span class=\"dim\">•</span> {item}" },
+          { "if": "cloneUrl", "text": "  <span class=\"cmd-green\">$</span> {cloneUrl}" },
+          { "if": "link.url", "text": "  <span class=\"dim\">repo:</span> <a href=\"{link.url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"cmd-link\">{link.url}</a>" },
+          { "text": "  <span class=\"dim\">tip:</span> type <span class=\"cmd-highlight\">open {name}</span> to mount it on the Holo-Deck." },
+          { "type": "rule" }
+        ],
+        "skillItems": [
+          { "match": { "field": "type", "value": "highlight" }, "text": "<span class=\"cmd-highlight\">{name}</span>" },
+          { "match": { "field": "type", "value": "learning" }, "text": "<span class=\"dim\">{name} [learning]</span>" },
+          { "fallback": true, "text": "<span class=\"cmd-amber\">{name}</span>" }
+        ],
+        "unknownCommand": [
+          { "text": "<span class=\"error\">bash: {arg}: command not found</span>" },
+          { "text": "  <span class=\"dim\">Type <span class=\"cmd-highlight\">help</span> for the command list or press <span class=\"cmd-highlight\">Tab</span> to autocomplete.</span>" }
+        ]
+      },
+      "commands": [
+        {
+          "cmd": "help",
+          "desc": "Display the command reference (help <cmd> for details)",
+          "usage": "help [command]",
+          "example": "help open",
+          "takes": "command",
+          "output": {
+            "default": [
+              { "type": "header", "text": "RIDDHIMANOS SHELL // COMMAND REFERENCE" },
+              { "text": "  <span class=\"cmd-name\">{cmd}</span> <span class=\"dim\">{desc}</span>", "loop": "commands" },
+              { "type": "rule" },
+              { "text": "  <span class=\"dim\"><span class=\"cmd-amber\">Tab</span> autocomplete • <span class=\"cmd-amber\">↑/↓</span> history • <span class=\"cmd-amber\">Ctrl+L</span> clear • <span class=\"cmd-amber\">Esc</span> cancel line</span>" }
+            ],
+            "withArg": { "template": "commandDetail" },
+            "invalidArg": [
+              { "class": "dim", "text": "Unknown command '{arg}'. Type <span class=\"cmd-highlight\">help</span> for the command list." }
+            ]
+          }
+        },
+        {
+          "cmd": "about",
+          "desc": "Visitor briefing on Riddhiman Kundal",
+          "usage": "about",
+          "output": {
+            "default": [
+              { "type": "header", "text": "VISITOR BRIEFING // RIDDHIMAN KUNDAL" },
+              { "type": "rule" },
+              { "text": "<span class=\"cmd-cyan\">{role}</span> <span class=\"dim\">@</span> <span class=\"cmd-link\">{tag}</span>", "typewriter": true },
+              { "text": "<span class=\"dim\">{institution}</span>", "typewriter": true },
+              { "text": "<span class=\"dim\">»</span> {statusMessage}", "typewriter": true }
+            ]
+          }
+        },
+        {
+          "cmd": "projects",
+          "desc": "List repositories; add <name> for deep detail",
+          "usage": "projects [project-name]",
+          "example": "projects opendroid_remote",
+          "takes": "project",
+          "output": {
+            "default": [
+              { "type": "header", "text": "OPEN-SOURCE REPOSITORIES [{projectCount} LOADED]" },
+              { "text": "  [{index}] <span class=\"cmd-cyan\">{name}</span>{stars}{category}", "loop": "projects", "raw": ["stars", "category"] },
+              { "text": "  <span class=\"dim\">▸ <span class=\"cmd-highlight\">projects &lt;name&gt;</span> for detail • <span class=\"cmd-highlight\">open &lt;name&gt;</span> to launch the Holo-Deck</span>" }
+            ],
+            "withArg": { "template": "projectDetail" },
+            "invalidArg": { "template": "projectNotFound" }
+          }
+        },
+        {
+          "cmd": "open",
+          "desc": "Focus a project on the Holo-Deck showcase",
+          "usage": "open <project-name>",
+          "example": "open Gemini-Discord-Bot",
+          "aliases": ["show", "focus"],
+          "takes": "project",
+          "output": {
+            "withArg": [
+              { "text": "<span class=\"success\">■ {name} mounted on the 3D Holo-Deck.</span>", "typewriter": true, "effect": "openProject" }
+            ],
+            "noArg": { "template": "openMissingArg" },
+            "invalidArg": { "template": "openMissingArg" }
+          }
+        },
+        {
+          "cmd": "skills",
+          "desc": "Display the technical capabilities matrix",
+          "usage": "skills",
+          "output": {
+            "default": [
+              { "type": "header", "text": "TECHNICAL CAPABILITIES MATRIX" },
+              { "text": "  <span class=\"cmd-cyan\">{category}</span>", "loop": "skills" },
+              { "text": "      {items}", "raw": ["items"], "loop": "skills", "list": { "field": "items", "template": "skillItems", "sep": " • " } }
+            ]
+          }
+        },
+        {
+          "cmd": "contact",
+          "desc": "List direct transmission channels & email",
+          "usage": "contact",
+          "output": {
+            "default": [
+              { "type": "header", "text": "SIGNAL TRANSMISSION ARRAY // OPEN CHANNELS" },
+              {
+                "loop": "channels",
+                "lines": [
+                  { "text": "  <span class=\"cmd-cyan\">{label}</span>" },
+                  { "text": "    <span class=\"dim\">{value}</span>" },
+                  { "if": "url", "text": "    <a href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"cmd-link\">{url}</a>" }
+                ]
+              },
+              { "text": "  <span class=\"dim\">▸ Visit the <span class=\"cmd-highlight\">{signalTower}</span> waypoint for the interactive console.</span>" }
+            ]
+          }
+        },
+        {
+          "cmd": "whoami",
+          "desc": "Display the current session identity",
+          "usage": "whoami",
+          "output": {
+            "default": [
+              { "text": "{whoami}", "typewriter": true }
+            ]
+          }
+        },
+        {
+          "cmd": "goto",
+          "desc": "Fly the camera to a landmark",
+          "usage": "goto <summit|cabin|campfire|tower|0-3>",
+          "example": "goto campfire",
+          "takes": "waypoint",
+          "output": {
+            "withArg": [
+              { "text": "<span class=\"success\">◉ {waypointLabel} selected. Flying camera...</span>", "typewriter": true, "effect": "teleport", "delay": 500 }
+            ],
+            "noArg": [
+              { "text": "<span class=\"error\">Unknown destination '{arg}'.</span>" },
+              { "text": "  <span class=\"dim\">destinations: {waypointList}</span>" }
+            ],
+            "invalidArg": [
+              { "text": "<span class=\"error\">Unknown destination '{arg}'.</span>" },
+              { "text": "  <span class=\"dim\">destinations: {waypointList}</span>" }
+            ]
+          }
+        },
+        {
+          "cmd": "summit",
+          "desc": "Return camera to the panoramic mountain summit",
+          "usage": "summit",
+          "aliases": ["home"],
+          "takes": "waypoint",
+          "waypoint": "summit",
+          "output": {
+            "default": [
+              { "text": "<span class=\"success\">◉ {waypointLabel} selected. Flying camera...</span>", "typewriter": true, "effect": "teleport", "delay": 500 }
+            ]
+          }
+        },
+        {
+          "cmd": "sysinfo",
+          "desc": "Dump RiddhimanOS system telemetry",
+          "usage": "sysinfo",
+          "aliases": ["neofetch"],
+          "output": {
+            "default": [
+              { "type": "header", "text": "RIDDHIMANOS // SYSTEM TELEMETRY" },
+              { "type": "rule" },
+              { "text": "  <span class=\"dim\">hostname:</span>   <span class=\"cmd-cyan\">{hostname}</span>" },
+              { "text": "  <span class=\"dim\">uptime:</span>     <span class=\"cmd-amber\">{uptime}</span>" },
+              { "text": "  <span class=\"dim\">shell:</span>      <span class=\"cmd-amber\">RiddhimanOS</span> (timber-cabin)" },
+              { "text": "  <span class=\"dim\">core:</span>       <span class=\"cmd-amber\">8 brain cells</span> (big cluster)" },
+              { "text": "  <span class=\"dim\">memory:</span>     <span class=\"cmd-amber\">1.2 TB</span> TimberCache (HE HAS RAMM !!)" },
+              { "text": "  <span class=\"dim\">repos:</span>      {projectCount} linked • <span class=\"cmd-amber\">★ {totalStars}</span> stars • <span class=\"cmd-amber\">⚑ {totalForks}</span> forks" },
+              { "text": "  <span class=\"dim\">languages:</span>  {languages}" },
+              { "type": "rule" }
+            ]
+          }
+        },
+        {
+          "cmd": "date",
+          "desc": "Print the current cabin system time",
+          "usage": "date",
+          "output": {
+            "default": [
+              { "text": "{date}", "typewriter": true }
+            ]
+          }
+        },
+        {
+          "cmd": "echo",
+          "desc": "Echo text back to the terminal",
+          "usage": "echo <text>",
+          "example": "echo hello cabin",
+          "takes": "text",
+          "output": {
+            "withArg": [
+              { "text": "{arg}", "typewriter": true }
+            ],
+            "noArg": [
+              { "text": "  <span class=\"dim\">usage: {usage}</span>" }
+            ]
+          }
+        },
+        {
+          "cmd": "ls",
+          "desc": "List remote modules linked to this workstation",
+          "usage": "ls",
+          "output": {
+            "default": [
+              { "type": "header", "text": "REMOTE MODULES // LINKED WORKSTATION" },
+              { "text": "  <span class=\"cmd-cyan\">{name}</span><span class=\"dim\"> → {desc}</span>", "loop": "modules" }
+            ]
+          }
+        },
+        {
+          "cmd": "banner",
+          "desc": "Re-print the boot banner & session hint",
+          "usage": "banner",
+          "output": {
+            "default": [
+              { "text": "<span class=\"success\">{banner}</span>", "class": "banner", "typewriter": true },
+              { "text": "Type <span class=\"cmd-highlight\">help</span> to view available commands.", "class": "dim", "typewriter": true }
+            ]
+          }
+        },
+        {
+          "cmd": "sound",
+          "desc": "Toggle keystroke sounds on/off",
+          "usage": "sound [on|off]",
+          "example": "sound off",
+          "takes": "sound",
+          "output": {
+            "default": [
+              { "text": "Keystroke sounds: {soundState}", "raw": ["soundState"] }
+            ],
+            "invalidArg": [
+              { "text": "Keystroke sounds: {soundState}", "raw": ["soundState"] },
+              { "text": "  <span class=\"dim\">usage: {usage}</span>" }
+            ]
+          }
+        },
+        {
+          "cmd": "sudo",
+          "desc": "Attempt to elevate privileges",
+          "usage": "sudo <command>",
+          "example": "sudo make me a sandwich",
+          "takes": "text",
+          "output": {
+            "withArg": [
+              { "text": "<span class=\"error\">[sudo] Permission denied: guest session has read-only clearance.</span>" },
+              { "text": "  <span class=\"dim\">This incident has been logged to the cabin syslog.</span>" }
+            ],
+            "noArg": [
+              { "text": "  <span class=\"dim\">usage: {usage}</span>" },
+              { "text": "  <span class=\"dim\">Hint: guests don't get root in this cabin.</span>" }
+            ]
+          }
+        },
+        {
+          "cmd": "clear",
+          "desc": "Clear the terminal screen buffer",
+          "usage": "clear",
+          "aliases": ["cls"],
+          "output": {
+            "default": [
+              { "type": "clear" }
+            ]
+          }
+        }
+      ]
     }
   },
   "journal": {

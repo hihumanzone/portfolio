@@ -551,9 +551,15 @@ class App {
     const history = document.getElementById('cli-history');
     if (!input || !history) return;
 
+    // Every piece of CLI copy (command list, help text, banners, errors) lives in
+    // content.json -> workstation.cli. JS only supplies behaviour + data tokens.
+    const cliConfig = content.workstation?.cli || {};
+    const cliTemplates = cliConfig.templates || {};
+
     const projs = content.workstation?.projects || [];
     const skillsList = content.workstation?.skills || [];
     const channels = content.contact?.channels || [];
+    const modules = cliConfig.modules || [];
     const waypointAliasSets = [
       ['summit', 'peak', 'overlook'],
       ['cabin', 'cabin-desk', 'desk', 'workspace'],
@@ -564,32 +570,43 @@ class App {
       name: (waypointAliasSets[i] && waypointAliasSets[i][0]) || w.name.toLowerCase(),
       aliases: waypointAliasSets[i] || [w.name.toLowerCase()],
       label: w.name || `LANDMARK ${i + 1}`,
+      code: w.code || `0${i + 1}`,
       index: i
     }));
-    const promptText = content.workstation?.cli?.prompt || 'guest@cabin:~$';
+    const promptText = cliConfig.prompt || 'guest@cabin:~$';
 
-    const COMMANDS = [
-      { cmd: 'help', desc: 'Display the command reference (help <cmd> for details)', usage: 'help [command]', example: 'help open' },
-      { cmd: 'about', desc: 'Visitor briefing on Riddhiman Kundal', usage: 'about' },
-      { cmd: 'projects', desc: 'List flagship repositories; add <name> for deep detail', usage: 'projects [project-name]', example: 'projects opendroid_remote' },
-      { cmd: 'open', desc: 'Focus a project on the 3D Holo-Deck showcase', usage: 'open <project-name>', example: 'open Gemini-Discord-Bot', aliases: ['show', 'focus'] },
-      { cmd: 'skills', desc: 'Display the technical capabilities matrix', usage: 'skills' },
-      { cmd: 'contact', desc: 'List direct transmission channels & email', usage: 'contact' },
-      { cmd: 'whoami', desc: 'Display the current session identity', usage: 'whoami' },
-      { cmd: 'goto', desc: 'Fly the camera to a landmark', usage: 'goto <summit|cabin|campfire|tower|0-3>', example: 'goto campfire' },
-      { cmd: 'summit', desc: 'Return camera to the panoramic mountain summit', usage: 'summit', aliases: ['home'] },
-      { cmd: 'sysinfo', desc: 'Dump RiddhimanOS system telemetry', usage: 'sysinfo', aliases: ['neofetch'] },
-      { cmd: 'date', desc: 'Print the current cabin system time', usage: 'date' },
-      { cmd: 'echo', desc: 'Echo text back to the terminal', usage: 'echo <text>', example: 'echo hello cabin' },
-      { cmd: 'ls', desc: 'List remote modules linked to this workstation', usage: 'ls' },
-      { cmd: 'banner', desc: 'Re-print the boot banner & session hint', usage: 'banner' },
-      { cmd: 'sound', desc: 'Toggle keystroke sounds on/off', usage: 'sound [on|off]', example: 'sound off' },
-      { cmd: 'sudo', desc: 'Attempt to elevate privileges', usage: 'sudo <command>', example: 'sudo make me a sandwich' },
-      { cmd: 'clear', desc: 'Clear the terminal screen buffer', usage: 'clear', aliases: ['cls'] }
-    ];
+    // Last-resort registry so the shell still responds if content.json is malformed.
+    const FALLBACK_COMMANDS = ['help', 'about', 'projects', 'open', 'skills',
+      'contact', 'whoami', 'goto', 'summit', 'sysinfo', 'date', 'echo', 'ls',
+      'banner', 'sound', 'sudo', 'clear'];
+
+    const rawCommands = Array.isArray(cliConfig.commands) && cliConfig.commands.length
+      ? cliConfig.commands
+      : FALLBACK_COMMANDS.map(cmd => ({ cmd, desc: '', usage: cmd }));
+
+    const COMMANDS = rawCommands
+      .filter(c => c && c.cmd)
+      .map(c => ({
+        cmd: String(c.cmd).toLowerCase(),
+        desc: c.desc || '',
+        usage: c.usage || c.cmd,
+        example: c.example || '',
+        aliases: (Array.isArray(c.aliases) ? c.aliases : []).map(a => String(a).toLowerCase()),
+        takes: c.takes || '',
+        waypoint: c.waypoint || '',
+        output: c.output || {}
+      }));
+
     const commandNames = COMMANDS.map(c => c.cmd);
-    const projectLookup = new Map(projs.map(p => [p.name.toLowerCase(), p]));
-    const projectKeys = projs.map(p => p.name.toLowerCase());
+    const commandByName = new Map();
+    COMMANDS.forEach(c => {
+      commandByName.set(c.cmd, c);
+      commandByName.set(c.cmd.replace(/[-_\s]+/g, ''), c);
+      c.aliases.forEach(a => {
+        commandByName.set(a, c);
+        commandByName.set(a.replace(/[-_\s]+/g, ''), c);
+      });
+    });
     const waypointNames = waypointDefs.map(w => w.name);
 
     const soundKey = 'riddhiman_cli_sound';
@@ -704,8 +721,210 @@ class App {
       step();
     };
 
-    const printHeader = (title) => printInstant(`<span class="cmd-header">${encodeEntities(title)}</span>`);
-    const printRule = () => printInstant(`<span class="cmd-rule">${'─'.repeat(54)}</span>`);
+    // Row-shaped views of the content data, consumed by content.json line templates.
+    const projectRows = projs.map((p, i) => ({
+      ...p,
+      index: String(i + 1).padStart(2, '0'),
+      stars: p.stats && p.stats.stars ? ` <span class="cmd-amber">★ ${p.stats.stars}</span>` : '',
+      category: p.categoryLabel ? ` <span class="dim">[${encodeEntities(p.categoryLabel)}]</span>` : ''
+    }));
+    const projectLookup = new Map(projectRows.map(p => [p.name.toLowerCase(), p]));
+    const projectKeys = projectRows.map(p => p.name.toLowerCase());
+
+    // ------------------------------------------------------------------
+    // Content-driven line renderer
+    //
+    // A command's output is a list of line specs declared in content.json.
+    //   { type: 'text'|'header'|'rule'|'blank'|'clear', text, class,
+    //     typewriter, speed, escape, raw[], if, match, loop, list,
+    //     effect, delay }
+    // `text` is an HTML template; `{token}` placeholders are filled from the
+    // render scope and HTML-escaped unless listed in `raw` (or `escape:false`).
+    // ------------------------------------------------------------------
+    const TOKEN_RE = /\{([a-zA-Z0-9_.]+)\}/g;
+
+    const getPath = (obj, path) => String(path).split('.').reduce(
+      (acc, key) => (acc === null || acc === undefined ? undefined : acc[key]),
+      obj
+    );
+
+    const isPresent = (v) => (
+      v !== undefined && v !== null && v !== false
+      && !(Array.isArray(v) && v.length === 0)
+      && String(v).trim() !== ''
+    );
+
+    const interpolate = (template, scope, opts) => {
+      if (template === undefined || template === null) return '';
+      const { raw = null, rawValues = null, escape = true } = opts || {};
+      return String(template).replace(TOKEN_RE, (match, key) => {
+        if (rawValues && Object.prototype.hasOwnProperty.call(rawValues, key)) {
+          return String(rawValues[key]);
+        }
+        const value = getPath(scope, key);
+        if (value === undefined || value === null) return '';
+        if (raw && raw.includes(key)) return String(value);
+        return escape ? encodeEntities(value) : String(value);
+      });
+    };
+
+    const lineApplies = (line, scope) => {
+      if (line.if !== undefined && !isPresent(getPath(scope, line.if))) return false;
+      if (line.match) {
+        const rules = Array.isArray(line.match) ? line.match : [line.match];
+        return rules.some(m => getPath(scope, m.field) === m.value);
+      }
+      return true;
+    };
+
+    // A scenario is either an inline line array or a `{ "template": "name" }` ref.
+    const resolveLineSpec = (spec) => {
+      if (Array.isArray(spec)) return spec;
+      if (typeof spec === 'string') return cliTemplates[spec] || [];
+      if (spec && typeof spec === 'object') {
+        if (Array.isArray(spec.template)) return spec.template;
+        if (typeof spec.template === 'string') return cliTemplates[spec.template] || [];
+      }
+      return [];
+    };
+
+    const scopeForItem = (scope, entry, i) => ({
+      ...scope,
+      ...(entry && typeof entry === 'object' ? entry : {}),
+      item: entry,
+      index: String(i + 1).padStart(2, '0')
+    });
+
+    // `loop` / `list` accept either a bare field name or `{ field, item, sep }`.
+    const loopFieldOf = (loop) => (typeof loop === 'string' ? loop : loop && loop.field);
+    const listFieldOf = (list) => (typeof list === 'string' ? list : list && list.field);
+
+    const materialize = (line, scope) => {
+      const type = line.type || 'text';
+      const raw = Array.isArray(line.raw) ? line.raw : null;
+      const escape = line.escape !== false;
+      let rawValues = null;
+
+      const listField = line.list ? listFieldOf(line.list) : null;
+      if (listField) {
+        const spec = typeof line.list === 'string' ? { field: listField } : line.list;
+        const source = getPath(scope, spec.field);
+        const entries = Array.isArray(source) ? source : [];
+        const sep = spec.sep === undefined ? ' ' : spec.sep;
+        const nested = spec.template ? resolveLineSpec({ template: spec.template }) : null;
+        rawValues = {
+          [spec.field]: entries
+            .map((entry) => {
+              const itemScope = scopeForItem(scope, entry, 0);
+              if (nested) {
+                return renderLineSpec(nested, itemScope).map(l => l.html || '').join('');
+              }
+              return interpolate(spec.item === undefined ? '{item}' : spec.item, itemScope, { escape });
+            })
+            .join(sep)
+        };
+      }
+
+      if (type === 'clear') return { clear: true };
+      if (type === 'blank') return { html: ' ', cls: '', typewriter: false, speed: 8, effect: '', delay: 0 };
+      if (type === 'rule') {
+        return { html: `<span class="cmd-rule">${'─'.repeat(Number(line.width) || 54)}</span>`, cls: '', typewriter: false, speed: 8, effect: '', delay: 0 };
+      }
+      if (type === 'header') {
+        return {
+          html: `<span class="cmd-header">${interpolate(line.text, scope, { raw, rawValues, escape })}</span>`,
+          cls: '', typewriter: false, speed: 8, effect: '', delay: 0
+        };
+      }
+      return {
+        html: interpolate(line.text, scope, { raw, rawValues, escape }),
+        cls: line.class || '',
+        typewriter: !!line.typewriter,
+        speed: line.speed || 8,
+        effect: line.effect || '',
+        delay: line.delay || 0
+      };
+    };
+
+    const renderLineSpec = (spec, scope) => {
+      if (Array.isArray(spec)) {
+        const flattened = [];
+        let ruleMatched = false;
+        spec.forEach(line => {
+          if (!line || typeof line !== 'object') return;
+          // `match` lines act as an if / else-if chain: once one hits, only a
+          // later `fallback` line can still render.
+          if (line.match) {
+            if (lineApplies(line, scope)) {
+              ruleMatched = true;
+              flattened.push(...renderLineSpec(line, scope));
+            }
+            return;
+          }
+          if (line.fallback) {
+            if (!ruleMatched) flattened.push(...renderLineSpec(line, scope));
+            return;
+          }
+          flattened.push(...renderLineSpec(line, scope));
+        });
+        return flattened;
+      }
+      if (!spec || typeof spec !== 'object') return [];
+      const line = spec;
+      const loopField = line.loop ? loopFieldOf(line.loop) : null;
+      if (loopField) {
+        const source = getPath(scope, loopField);
+        const entries = Array.isArray(source) ? source : [];
+        const out = [];
+        entries.forEach((entry, i) => {
+          out.push(...renderLineSpec({ ...line, loop: undefined }, scopeForItem(scope, entry, i)));
+        });
+        return out;
+      }
+      if (line.lines) return renderLineSpec(line.lines, scope);
+      if (!lineApplies(line, scope)) return [];
+      return [materialize(line, scope)];
+    };
+
+    // Side effects that need the render scope (declared via line.effect).
+    const CLI_EFFECTS = {
+      openProject: {
+        before: (scope) => {
+          if (scope.$resolved) focusShowcaseProject(scope.$resolved.id);
+        },
+        after: () => {
+          const tab = document.querySelector('.tab-btn[data-tab="projects"]');
+          if (tab && !tab.classList.contains('active')) tab.click();
+        }
+      },
+      teleport: {
+        after: (scope) => {
+          if (!scope.$resolved) return;
+          this.closeModal('terminal-modal');
+          this.switchWaypoint(scope.$resolved.index);
+        }
+      }
+    };
+
+    const emitLines = (lines, scope) => {
+      lines.forEach((line) => {
+        if (!line) return;
+        if (line.clear) {
+          history.innerHTML = '';
+          return;
+        }
+        const effect = line.effect ? CLI_EFFECTS[line.effect] : null;
+        if (effect && typeof effect.before === 'function') effect.before(scope);
+        const done = () => {
+          if (effect && typeof effect.after === 'function') {
+            setTimeout(effect.after, line.delay || 0, scope);
+          }
+        };
+        if (line.typewriter) typewriter(line.html, line.cls, { speed: line.speed, onDone: done });
+        else { printInstant(line.html, line.cls); done(); }
+      });
+      scrollToBottom();
+    };
 
     const findProject = (query) => {
       const q = query.trim().toLowerCase().replace(/['"_]/g, '');
@@ -718,8 +937,10 @@ class App {
     };
 
     const norm = (s) => s.toLowerCase().replace(/[-_\s]+/g, '');
+    const findCommand = (name) => commandByName.get(String(name || '').trim().toLowerCase()) || null;
     const findWaypoint = (query) => {
-      const q = query.trim().toLowerCase();
+      const q = String(query || '').trim().toLowerCase();
+      if (!q) return null;
       if (/^\d+$/.test(q)) {
         const wp = waypointDefs[parseInt(q, 10)];
         if (wp) return wp;
@@ -729,29 +950,6 @@ class App {
         || waypointDefs.find(w => w.aliases.some(a => norm(a) === nq))
         || waypointDefs.find(w => w.aliases.some(a => norm(a).startsWith(nq)))
         || null;
-    };
-
-    const showProjectDetails = (p) => {
-      printRule();
-      printInstant(`<span class="cmd-id">${p.id}</span> <span class="cmd-cyan">${p.name}</span> <span class="dim">${p.categoryLabel || ''}</span>`);
-      if (p.badge) printInstant(`  <span class="cmd-amber">${p.badge}</span>`);
-      if (p.stats) printInstant(`  <span class="dim">language:</span> <span class="cmd-amber">${encodeEntities(p.stats.language)}</span> <span class="dim">• stars:</span> <span class="cmd-amber">${p.stats.stars}</span> <span class="dim">• forks:</span> <span class="cmd-amber">${p.stats.forks}</span>`);
-      printInstant(' ');
-      if (p.description) printInstant(`  ${encodeEntities(p.description)}`);
-      if (p.tags && p.tags.length) printInstant(`  <span class="dim">stack:</span> ${p.tags.map(t => `<span class="cmd-tag">${encodeEntities(t)}</span>`).join(' ')}`);
-      printInstant(' ');
-      if (p.features && p.features.length) {
-        printInstant(`  <span class="cmd-cyan">▸ KEY FEATURES</span>`);
-        p.features.forEach(f => printInstant(`    <span class="dim">•</span> ${encodeEntities(f)}`));
-      }
-      if (p.architecture && p.architecture.length) {
-        printInstant(`  <span class="cmd-cyan">▸ ARCHITECTURE</span>`);
-        p.architecture.forEach(a => printInstant(`    <span class="dim">•</span> ${encodeEntities(a)}`));
-      }
-      if (p.cloneUrl) printInstant(`  <span class="cmd-green">$</span> ${encodeEntities(p.cloneUrl)}`);
-      if (p.link && p.link.url) printInstant(`  <span class="dim">repo:</span> <a href="${p.link.url}" target="_blank" rel="noopener noreferrer" class="cmd-link">${p.link.url}</a>`);
-      printInstant(`  <span class="dim">tip:</span> type <span class="cmd-highlight">open ${p.name}</span> to mount it on the Holo-Deck.`);
-      printRule();
     };
 
     const resetShowcaseFilter = () => {
@@ -786,17 +984,6 @@ class App {
       sc.updateActiveProjectSummary();
     };
 
-    const teleport = (index, label) => {
-      typewriter(`<span class="success">◉ ${encodeEntities(label)} selected. Flying camera...</span>`, '', {
-        onDone: () => {
-          setTimeout(() => {
-            this.closeModal('terminal-modal');
-            this.switchWaypoint(index);
-          }, 500);
-        }
-      });
-    };
-
     let completionList = [];
     let completionIdx = 0;
 
@@ -805,6 +992,7 @@ class App {
       const parts = trimmed.split(/\s+/);
       const head = parts[0] ? parts[0].toLowerCase() : '';
       const last = parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+      const cmd = findCommand(head);
       let candidates = [];
       const replaceLast = parts.length > 1;
 
@@ -812,14 +1000,16 @@ class App {
         candidates = commandNames.slice();
       } else if (parts.length === 1) {
         candidates = commandNames.filter(n => n.startsWith(head));
-      } else if (head === 'open' || head === 'projects') {
+      } else if (cmd && cmd.takes === 'project') {
         candidates = projectKeys.filter(n => n.startsWith(last));
-      } else if (head === 'goto') {
+      } else if (cmd && cmd.takes === 'command') {
+        candidates = commandNames.filter(n => n.startsWith(last));
+      } else if (cmd && cmd.takes === 'waypoint' && !cmd.waypoint) {
         candidates = waypointNames.filter(n => n.startsWith(last));
-      } else if (head === 'sound') {
+      } else if (cmd && cmd.takes === 'sound') {
         candidates = ['on', 'off'].filter(n => n.startsWith(last));
       } else {
-        candidates = commandNames.filter(n => n.startsWith(head) || head.startsWith(n));
+        return;
       }
 
       if (candidates.length === 0) return;
@@ -839,217 +1029,108 @@ class App {
       if (typedSoundOn && typeof soundscape.playKeyClick === 'function') soundscape.playKeyClick();
     };
 
+    // Token scope handed to every line template: live telemetry, derived rows
+    // and the identity fields the shell borrows from the rest of content.json.
+    const buildScope = (extra) => {
+      const totalStars = projectRows.reduce((s, p) => s + (p.stats?.stars || 0), 0);
+      const totalForks = projectRows.reduce((s, p) => s + (p.stats?.forks || 0), 0);
+      const languages = [...new Set(projectRows
+        .map(p => (p.stats?.language || 'unknown').split(' / ')[0]))].join(', ');
+      const upMs = Math.max(0, Date.now() - this._bootTime);
+      const upH = Math.floor(upMs / 3600000);
+      const upM = Math.floor((upMs % 3600000) / 60000);
+      const tower = waypointDefs.find(w => /tower|signal|comm/i.test(w.label)) || waypointDefs[3];
+
+      return {
+        commands: COMMANDS,
+        projects: projectRows,
+        skills: skillsList.map(s => ({
+          ...s,
+          category: String(s.category || '').replace(/\s*\/\/\s*/, '').trim()
+        })),
+        channels,
+        modules,
+        projectCount: projectRows.length,
+        totalStars,
+        totalForks,
+        languages,
+        hostname: String(content.personal?.name || 'riddhiman').replace(/\s+/g, '-').toLowerCase(),
+        uptime: `${upH}h ${upM}m`,
+        date: new Date().toLocaleString('en-GB', {
+          weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }),
+        soundLabel: typedSoundOn ? 'ON' : 'OFF',
+        soundState: typedSoundOn ? '<span class="success">ON</span>' : '<span class="error">OFF</span>',
+        banner: cliConfig.banner || 'RiddhimanOS Terminal',
+        hint: cliConfig.hint || '',
+        prompt: promptText,
+        whoami: cliConfig.whoami || 'guest@riddhiman-cabin (visitor | read-only terminal access)',
+        waypointList: waypointNames.join(', '),
+        signalTower: tower ? `${tower.code} ${tower.label}` : 'SIGNAL TOWER',
+        role: content.personal?.role || '',
+        tag: content.personal?.tag || '',
+        institution: content.personal?.institution || '',
+        statusMessage: content.personal?.statusMessage || '',
+        ...extra
+      };
+    };
+
+    // Argument resolvers keyed by a command's `takes` field. Returning a falsy
+    // value marks the argument invalid and selects the `invalidArg` output.
+    const ARG_TAKERS = {
+      project: (cmd, arg) => findProject(arg),
+      waypoint: (cmd, arg) => findWaypoint(cmd.waypoint || arg),
+      command: (cmd, arg) => findCommand(arg),
+      text: (cmd, arg) => (String(arg).trim() ? { text: arg } : null),
+      sound: (cmd, arg) => {
+        const q = String(arg).trim().toLowerCase();
+        if (q !== 'on' && q !== 'off') return null;
+        typedSoundOn = q === 'on';
+        persistSound();
+        return { state: typedSoundOn };
+      }
+    };
+
     const execute = (raw) => {
-      const parts = raw.split(/\s+/);
+      const parts = String(raw).trim().split(/\s+/);
       const head = parts[0].toLowerCase();
       const arg = parts.slice(1).join(' ');
       const arg0 = parts[1] ? parts[1].toLowerCase() : '';
 
-      switch (head) {
-        case 'help': {
-          if (arg0) {
-            const meta = COMMANDS.find(c => c.cmd === arg0 || (c.aliases && c.aliases.includes(arg0)));
-            if (meta) {
-              printInstant(`<span class="cmd-cyan">${meta.cmd}</span> — <span class="dim">${meta.desc}</span>`);
-              printInstant(`  <span class="cmd-highlight">usage:</span>  <span class="dim">${meta.usage}</span>`);
-              if (meta.example) printInstant(`  <span class="cmd-highlight">example:</span> <span class="cmd-amber">${meta.example}</span>`);
-              if (meta.aliases) printInstant(`  <span class="dim">aliases:</span> ${meta.aliases.map(a => `<span class="cmd-name">${a}</span>`).join(' ')}`);
-            } else {
-              printInstant(`Unknown command '${encodeEntities(arg)}'. Type <span class="cmd-highlight">help</span> for the command list.`, 'dim');
-            }
-            break;
-          }
-          printHeader('RIDDHIMANOS SHELL // COMMAND REFERENCE');
-          COMMANDS.forEach(c => {
-            printInstant(`  <span class="cmd-name">${c.cmd}</span> <span class="dim">${c.desc}</span>`);
-          });
-          printRule();
-          printInstant(`  <span class="dim"><span class="cmd-amber">Tab</span> autocomplete • <span class="cmd-amber">↑/↓</span> history • <span class="cmd-amber">Ctrl+L</span> clear • <span class="cmd-amber">Esc</span> cancel line</span>`);
-          break;
-        }
-
-        case 'about': {
-          printHeader('VISITOR BRIEFING // RIDDHIMAN KUNDAL');
-          printRule();
-          typewriter(`<span class="cmd-cyan">${encodeEntities(content.personal.role)}</span> <span class="dim">@</span> <span class="cmd-link">${encodeEntities(content.personal.tag)}</span>`);
-          typewriter(`<span class="dim">${encodeEntities(content.personal.institution)}</span>`);
-          typewriter(`<span class="dim">»</span> ${encodeEntities(content.personal.statusMessage)}`);
-          break;
-        }
-
-        case 'projects': {
-          if (arg0) {
-            const found = findProject(arg);
-            if (found) {
-              showProjectDetails(found);
-            } else {
-              printInstant(`<span class="error">No project matches '${encodeEntities(arg)}'.</span>`);
-              printInstant(`  <span class="dim">Try <span class="cmd-highlight">projects</span> to list all repositories.</span>`);
-            }
-            break;
-          }
-          printHeader(`FLAGSHIP OPEN-SOURCE REPOSITORIES [${projs.length} LOADED]`);
-          projs.forEach((p, i) => {
-            const starBadge = p.stats && p.stats.stars ? ` <span class="cmd-amber">★ ${p.stats.stars}</span>` : '';
-            const cat = p.categoryLabel ? ` <span class="dim">[${encodeEntities(p.categoryLabel)}]</span>` : '';
-            printInstant(`  [0${i + 1}] <span class="cmd-cyan">${encodeEntities(p.name)}</span>${starBadge}${cat}`);
-          });
-          printInstant(`  <span class="dim">▸ <span class="cmd-highlight">projects &lt;name&gt;</span> for detail • <span class="cmd-highlight">open &lt;name&gt;</span> to launch the Holo-Deck</span>`);
-          break;
-        }
-
-        case 'open':
-        case 'show':
-        case 'focus': {
-          const found = findProject(arg);
-          if (!found) {
-            printInstant(`<span class="error">No project matches '${encodeEntities(arg)}'.</span>`);
-            printInstant(`  <span class="dim">usage: open &lt;project-name&gt; • e.g. <span class="cmd-amber">open opendroid_remote</span></span>`);
-            break;
-          }
-          focusShowcaseProject(found.id);
-          typewriter(`<span class="success">■ ${encodeEntities(found.name)} mounted on the 3D Holo-Deck.</span>`, '', {
-            onDone: () => {
-              const tab = document.querySelector('.tab-btn[data-tab="projects"]');
-              if (tab && !tab.classList.contains('active')) tab.click();
-            }
-          });
-          break;
-        }
-
-        case 'skills': {
-          printHeader('TECHNICAL CAPABILITIES MATRIX');
-          skillsList.forEach(cat => {
-            const catName = cat.category.replace(/\s*\/\/\s*/, '').trim();
-            printInstant(`  <span class="cmd-cyan">${encodeEntities(catName)}</span>`);
-            const items = (cat.items || []).map(it => {
-              if (it.type === 'highlight') return `<span class="cmd-highlight">${encodeEntities(it.name)}</span>`;
-              if (it.type === 'learning') return `<span class="dim">${encodeEntities(it.name)} [learning]</span>`;
-              return `<span class="cmd-amber">${encodeEntities(it.name)}</span>`;
-            });
-            printInstant(`      ${items.join(' • ')}`);
-          });
-          break;
-        }
-
-        case 'contact': {
-          printHeader('SIGNAL TRANSMISSION ARRAY // OPEN CHANNELS');
-          channels.forEach(ch => {
-            printInstant(`  <span class="cmd-cyan">${encodeEntities(ch.label)}</span>`);
-            printInstant(`    <span class="dim">${encodeEntities(ch.value)}</span>`);
-            if (ch.url) printInstant(`    <a href="${encodeEntities(ch.url)}" target="_blank" rel="noopener noreferrer" class="cmd-link">${encodeEntities(ch.url)}</a>`);
-          });
-          printInstant(`  <span class="dim">▸ Visit the <span class="cmd-highlight">04_SIGNAL TOWER</span> waypoint for the interactive console.</span>`);
-          break;
-        }
-
-        case 'whoami':
-          typewriter(encodeEntities(content.workstation?.cli?.whoami || 'guest@riddhiman-cabin (visitor - read-only terminal access)'));
-          break;
-
-        case 'goto': {
-          const wp = findWaypoint(arg);
-          if (!wp) {
-            printInstant(`<span class="error">Unknown destination '${encodeEntities(arg)}'.</span>`);
-            printInstant(`  <span class="dim">destinations: ${waypointNames.join(', ')}</span>`);
-            break;
-          }
-          teleport(wp.index, wp.label);
-          break;
-        }
-
-        case 'summit':
-        case 'home':
-          teleport(0, 'SUMMIT');
-          break;
-
-        case 'sysinfo':
-        case 'neofetch': {
-          const totalStars = projs.reduce((s, p) => s + (p.stats?.stars || 0), 0);
-          const totalForks = projs.reduce((s, p) => s + (p.stats?.forks || 0), 0);
-          const languages = [...new Set(projs.map(p => (p.stats?.language || 'unknown').split(' / ')[0]))].join(', ');
-          const upMs = Math.max(0, Date.now() - this._bootTime);
-          const upH = Math.floor(upMs / 3600000);
-          const upM = Math.floor((upMs % 3600000) / 60000);
-          const hostname = content.personal?.name.replace(/\s+/g, '-').toLowerCase();
-          printHeader('RIDDHIMANOS // SYSTEM TELEMETRY');
-          printRule();
-          printInstant(`  <span class="dim">hostname:</span>   <span class="cmd-cyan">${encodeEntities(hostname)}</span>`);
-          printInstant(`  <span class="dim">uptime:</span>     <span class="cmd-amber">${upH}h ${upM}m</span>`);
-          printInstant(`  <span class="dim">shell:</span>      <span class="cmd-amber">RiddhimanOS v2.5</span> (x86_64-timber-cabin)`);
-          printInstant(`  <span class="dim">core:</span>       <span class="cmd-amber">8× neural co-processor</span> (local-first cluster)`);
-          printInstant(`  <span class="dim">memory:</span>     <span class="cmd-amber">1.2 TB</span> TimberCache (zero-instrumentation)`);
-          printInstant(`  <span class="dim">repos:</span>      ${projs.length} linked • <span class="cmd-amber">★ ${totalStars}</span> stars • <span class="cmd-amber">⚑ ${totalForks}</span> forks`);
-          printInstant(`  <span class="dim">languages:</span>  ${encodeEntities(languages)}`);
-          printRule();
-          break;
-        }
-
-        case 'date':
-          typewriter(new Date().toLocaleString('en-GB', {
-            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-          }));
-          break;
-
-        case 'echo':
-          if (!arg) {
-            printInstant(`  <span class="dim">usage: echo &lt;text&gt;</span>`);
-          } else {
-            typewriter(encodeEntities(arg));
-          }
-          break;
-
-        case 'ls':
-          printHeader('REMOTE MODULES // LINKED WORKSTATION');
-          [
-            ['projects', '01_PROJECTS • 3D Holo-Deck showcase'],
-            ['skills', '02_TECH_MATRIX • capability matrix'],
-            ['cli', '03_INTERACTIVE_CLI • you are here'],
-            ['journal', 'CAMPFIRE LOG • engineering journal'],
-            ['comms', 'TRANSMISSION ARRAY • contact console']
-          ].forEach(([name, desc]) => {
-            printInstant(`  <span class="cmd-cyan">${name}</span><span class="dim"> → ${desc}</span>`);
-          });
-          break;
-
-        case 'banner':
-          typewriter(`<span class="success">${encodeEntities(content.workstation?.cli?.banner || 'RiddhimanOS Terminal v2.5 (x86_64-timber-cabin)')}</span>`, 'banner');
-          typewriter(`Type <span class="cmd-highlight">help</span> to view available commands.`, 'dim');
-          break;
-
-        case 'sound': {
-          if (arg0 === 'on' || arg0 === 'off') {
-            typedSoundOn = arg0 === 'on';
-            persistSound();
-          }
-          printInstant(`Keystroke sounds: <span class="${typedSoundOn ? 'success' : 'error'}">${typedSoundOn ? 'ON' : 'OFF'}</span>`);
-          if (arg0 && arg0 !== 'on' && arg0 !== 'off') {
-            printInstant(`  <span class="dim">usage: sound [on|off]</span>`);
-          }
-          break;
-        }
-
-        case 'sudo':
-          if (arg) {
-            printInstant('<span class="error">[sudo] Permission denied: guest session has read-only clearance.</span>');
-            printInstant(`  <span class="dim">This incident has been logged to the cabin syslog.</span>`);
-          } else {
-            printInstant(`  <span class="dim">usage: sudo &lt;command&gt;</span>`);
-            printInstant(`  <span class="dim">Hint: guests don't get root in this cabin.</span>`);
-          }
-          break;
-
-        case 'clear':
-        case 'cls':
-          history.innerHTML = '';
-          break;
-
-        default:
-          printInstant(`<span class="error">bash: ${encodeEntities(head)}: command not found</span>`);
-          printInstant(`  <span class="dim">Type <span class="cmd-highlight">help</span> for the command list or press <span class="cmd-highlight">Tab</span> to autocomplete.</span>`);
-          break;
+      const cmd = findCommand(head);
+      if (!cmd) {
+        const scope = buildScope({ arg: arg || head, arg0: '', command: head, $resolved: null });
+        emitLines(renderLineSpec(resolveLineSpec({ template: 'unknownCommand' }), scope), scope);
+        return;
       }
+
+      const taker = ARG_TAKERS[cmd.takes];
+      const resolved = taker ? taker(cmd, arg) : null;
+      const out = cmd.output || {};
+
+      // Scenario precedence: noArg -> invalidArg -> withArg -> default.
+      let spec;
+      if (!arg) {
+        spec = out.noArg !== undefined ? out.noArg : out.default;
+      } else if (taker && !resolved) {
+        spec = out.invalidArg !== undefined ? out.invalidArg : out.default;
+      } else {
+        spec = out.withArg !== undefined ? out.withArg : out.default;
+      }
+
+      const scope = buildScope({ arg, arg0, command: cmd.cmd, $resolved: resolved });
+      Object.assign(scope, cmd);
+      if (resolved && typeof resolved === 'object') {
+        if (cmd.takes === 'waypoint') {
+          scope.waypointLabel = resolved.label;
+          scope.waypointIndex = String(resolved.index);
+        } else {
+          Object.assign(scope, resolved);
+        }
+      }
+
+      emitLines(renderLineSpec(resolveLineSpec(spec), scope), scope);
     };
 
     input.addEventListener('keydown', (e) => {
