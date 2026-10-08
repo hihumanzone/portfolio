@@ -185,7 +185,7 @@ class App {
     if (this.cabin && this.cabin.signalTower) {
       this.interaction.registerTarget(this.cabin.signalTower, {
         id: 'signalTower',
-        label: content.navigation?.interactiveTargets?.signalTower?.label || 'OPEN SIGNAL TRANSMISSION',
+        label: content.navigation?.interactiveTargets?.signalTower?.label || 'OPEN CONTACTS',
         waypointIndex: 3,
         modalId: 'contact-modal'
       });
@@ -194,7 +194,7 @@ class App {
     if (this.cabin && this.cabin.group) {
       this.interaction.registerTarget(this.cabin.group, {
         id: 'cabin',
-        label: content.navigation?.interactiveTargets?.cabin?.label || 'ENTER CABIN WORKSPACE',
+        label: content.navigation?.interactiveTargets?.cabin?.label || 'OPEN PROJECTS',
         waypointIndex: 1,
         modalId: 'terminal-modal'
       });
@@ -203,7 +203,7 @@ class App {
     if (this.campfire && this.campfire.group) {
       this.interaction.registerTarget(this.campfire.group, {
         id: 'campfire',
-        label: content.navigation?.interactiveTargets?.campfire?.label || 'INSPECT CAMPFIRE JOURNAL',
+        label: content.navigation?.interactiveTargets?.campfire?.label || 'OPEN JOURNAL',
         waypointIndex: 2,
         modalId: 'journal-modal',
         onClick: () => {
