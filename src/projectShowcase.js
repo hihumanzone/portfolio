@@ -2,8 +2,138 @@ import * as THREE from 'three';
 import { soundscape } from './audio.js';
 
 /**
+ * Procedural Canvas Texture Generators
+ * Creates high-detail warning hazard stripes, tactical HUD reticles, and tech decals.
+ */
+function createHazardStripeTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, 128, 32);
+  ctx.fillStyle = '#f59e0b';
+  for (let x = -32; x < 160; x += 32) {
+    ctx.beginPath();
+    ctx.moveTo(x, 32);
+    ctx.lineTo(x + 16, 0);
+    ctx.lineTo(x + 32, 0);
+    ctx.lineTo(x + 16, 32);
+    ctx.closePath();
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 1);
+  return tex;
+}
+
+function createScreenHudTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 288;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 512, 288);
+
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+  ctx.lineWidth = 2.5;
+  const len = 22;
+  const pad = 12;
+
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(pad, pad + len);
+  ctx.lineTo(pad, pad);
+  ctx.lineTo(pad + len, pad);
+  ctx.stroke();
+
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(512 - pad - len, pad);
+  ctx.lineTo(512 - pad, pad);
+  ctx.lineTo(512 - pad, pad + len);
+  ctx.stroke();
+
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(pad, 288 - pad - len);
+  ctx.lineTo(pad, 288 - pad);
+  ctx.lineTo(pad + len, 288 - pad);
+  ctx.stroke();
+
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(512 - pad - len, 288 - pad);
+  ctx.lineTo(512 - pad, 288 - pad);
+  ctx.lineTo(512 - pad, 288 - pad - len);
+  ctx.stroke();
+
+  // Fine crosshair / registration marks
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+  ctx.font = 'bold 9px monospace';
+  ctx.fillText('DISPLAY // UHD-OLED', pad + 6, 288 - pad - 6);
+  ctx.fillText('OPTICAL-LINK // 60FPS', 512 - pad - 120, 288 - pad - 6);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  return tex;
+}
+
+function createRearTechLabelTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#070c14';
+  ctx.fillRect(0, 0, 256, 128);
+
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(4, 4, 248, 120);
+
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = 'bold 11px monospace';
+  ctx.fillText('RIDDHIMAN ROBOTICS', 14, 22);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '8px monospace';
+  ctx.fillText('MODEL: HUD-MK-IV // 3D STAGE RIG', 14, 38);
+  ctx.fillText('BUS: 48V DC // VESA 100x100 STD', 14, 52);
+  ctx.fillText('SER: #RR-8842-HEX // STATUS: NOMINAL', 14, 66);
+
+  // Barcode imitation
+  ctx.fillStyle = '#cbd5e1';
+  let bx = 14;
+  while (bx < 240) {
+    const bw = Math.random() > 0.5 ? 2 : 4;
+    ctx.fillRect(bx, 80, bw, 28);
+    bx += bw + (Math.random() > 0.4 ? 2 : 3);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  return tex;
+}
+
+function createSoftGlowTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+  grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.4)');
+  grad.addColorStop(0.7, 'rgba(255, 255, 255, 0.1)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(canvas);
+  return tex;
+}
+
+/**
  * 3D Project Showcase Module
- * Manages the interactive Three.js 3D Holo-Deck stage, 3D card parallax tilt in Grid view,
+ * Manages the interactive Three.js 3D Holo-Deck stage, central articulated robotic arm,
+ * realistic VESA-mounted multi-monitors, 3D card parallax tilt in Grid view,
  * search & category filtering, multi-screenshot galleries, and the Deep Dive 3D Project Inspector.
  */
 export class ProjectShowcase {
@@ -23,6 +153,17 @@ export class ProjectShowcase {
     this.cardMeshes = [];
     this.particleSystem = null;
     this.gridPlatform = null;
+
+    // Central Mechanical Arm & Articulated Sub-Arms
+    this.robotBaseGroup = null;
+    this.robotTurret = null;
+    this.subArmMeshes = [];
+    this.reactorCoreMat = null;
+    this.beaconMat = null;
+    this.beaconLight = null;
+    this.coreLight = null;
+    this.turntableGear = null;
+    this.centerRadius = 5.8;
 
     // Carousel physics & interaction
     this.currentIndex = 0;
@@ -84,28 +225,161 @@ export class ProjectShowcase {
   }
 
   initSharedResources() {
-    const cardWidth = 4.2;
-    const cardHeight = 2.45;
-    const cardDepth = 0.08;
+    const cardWidth = 4.4;
+    const cardHeight = 2.58;
+    const cardDepth = 0.18; // Substantial realistic monitor depth
 
     // Max bounds of the screen plane; per-image aspect fit scales within these.
-    this.screenMaxW = cardWidth - 0.18;
-    this.screenMaxH = cardHeight - 0.18;
+    this.screenMaxW = cardWidth - 0.28;
+    this.screenMaxH = cardHeight - 0.32;
 
+    // 1. Monitor Geometries
     this.sharedGeometries.chassis = new THREE.BoxGeometry(cardWidth, cardHeight, cardDepth);
     this.sharedGeometries.edges = new THREE.EdgesGeometry(this.sharedGeometries.chassis);
+    this.sharedGeometries.screenBacking = new THREE.PlaneGeometry(this.screenMaxW, this.screenMaxH);
     this.sharedGeometries.screen = new THREE.PlaneGeometry(this.screenMaxW, this.screenMaxH);
-    this.sharedGeometries.led = new THREE.SphereGeometry(0.065, 12, 12);
+    this.sharedGeometries.screenOverlay = new THREE.PlaneGeometry(this.screenMaxW, this.screenMaxH);
+    this.sharedGeometries.bezelChin = new THREE.BoxGeometry(cardWidth, 0.22, 0.04);
+    this.sharedGeometries.bezelTop = new THREE.BoxGeometry(cardWidth, 0.10, 0.04);
+    this.sharedGeometries.bezelSide = new THREE.BoxGeometry(0.12, cardHeight - 0.30, 0.04);
+    this.sharedGeometries.glowHalo = new THREE.PlaneGeometry(cardWidth + 0.8, cardHeight + 0.8);
+    this.sharedGeometries.rearHousing = new THREE.BoxGeometry(2.2, 1.4, 0.14);
+    this.sharedGeometries.vesaPlate = new THREE.BoxGeometry(0.9, 0.9, 0.05);
+    this.sharedGeometries.hexBolt = new THREE.CylinderGeometry(0.035, 0.035, 0.05, 6);
+    this.sharedGeometries.ioBay = new THREE.BoxGeometry(1.1, 0.20, 0.06);
+    this.sharedGeometries.led = new THREE.SphereGeometry(0.045, 12, 12);
+    this.sharedGeometries.activityLed = new THREE.SphereGeometry(0.032, 10, 10);
+    this.sharedGeometries.cableHead = new THREE.BoxGeometry(0.16, 0.10, 0.16);
+    this.sharedGeometries.ballGimbal = new THREE.SphereGeometry(0.13, 16, 16);
+    this.sharedGeometries.gimbalCollar = new THREE.CylinderGeometry(0.16, 0.16, 0.12, 16);
 
+    // 2. Streamlined Robotic Arm Geometries
+    this.sharedGeometries.armPivot = new THREE.CylinderGeometry(0.18, 0.18, 0.28, 16);
+    this.sharedGeometries.armCap = new THREE.CylinderGeometry(0.20, 0.20, 0.03, 16);
+
+    // 3. Monitor Materials
     this.sharedMaterials.chassis = new THREE.MeshStandardMaterial({
-      color: 0x09101c,
-      metalness: 0.75,
+      color: 0x0a101d,
+      metalness: 0.85,
+      roughness: 0.32
+    });
+
+    this.sharedMaterials.chassisAccent = new THREE.MeshStandardMaterial({
+      color: 0x141d2e,
+      metalness: 0.9,
+      roughness: 0.25
+    });
+
+    this.sharedMaterials.bezelChin = new THREE.MeshStandardMaterial({
+      color: 0x111928,
+      metalness: 0.88,
+      roughness: 0.3
+    });
+
+    this.sharedMaterials.screenBacking = new THREE.MeshBasicMaterial({
+      color: 0x040810
+    });
+
+    this.sharedMaterials.armDark = new THREE.MeshStandardMaterial({
+      color: 0x0c1422,
+      metalness: 0.9,
       roughness: 0.35
+    });
+
+    this.sharedMaterials.armSteel = new THREE.MeshStandardMaterial({
+      color: 0x1e2c44,
+      metalness: 0.85,
+      roughness: 0.38
+    });
+
+    this.sharedMaterials.chrome = new THREE.MeshStandardMaterial({
+      color: 0xe6edf8,
+      metalness: 0.96,
+      roughness: 0.12
+    });
+
+    this.sharedMaterials.vesaSteel = new THREE.MeshStandardMaterial({
+      color: 0x22334d,
+      metalness: 0.9,
+      roughness: 0.3
+    });
+
+    this.sharedMaterials.cableRubber = new THREE.MeshStandardMaterial({
+      color: 0x080d16,
+      roughness: 0.85,
+      metalness: 0.1
+    });
+
+    this.sharedMaterials.glassGloss = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.035,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    });
+
+    this.sharedMaterials.screenHud = new THREE.MeshBasicMaterial({
+      map: createScreenHudTexture(),
+      transparent: true,
+      opacity: 0.65,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+
+    this.sharedMaterials.armCyberLine = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.75
+    });
+
+    this.sharedMaterials.rearLabel = new THREE.MeshStandardMaterial({
+      map: createRearTechLabelTexture(),
+      roughness: 0.5,
+      metalness: 0.4
+    });
+
+    this.sharedMaterials.hazardRing = new THREE.MeshStandardMaterial({
+      map: createHazardStripeTexture(),
+      roughness: 0.6,
+      metalness: 0.3
+    });
+
+    const glowTex = createSoftGlowTexture();
+    this.sharedMaterials.haloCyan = new THREE.MeshBasicMaterial({
+      map: glowTex,
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.sharedMaterials.haloAmber = new THREE.MeshBasicMaterial({
+      map: glowTex,
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.sharedMaterials.haloGreen = new THREE.MeshBasicMaterial({
+      map: glowTex,
+      color: 0x10b981,
+      transparent: true,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
     });
 
     this.sharedMaterials.ledAmber = new THREE.MeshBasicMaterial({ color: 0xffaa33 });
     this.sharedMaterials.ledCyan = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
     this.sharedMaterials.ledGreen = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+    this.sharedMaterials.ledRed = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    this.sharedMaterials.ledOff = new THREE.MeshBasicMaterial({ color: 0x162032 });
   }
 
   initDomReferences() {
@@ -223,11 +497,15 @@ export class ProjectShowcase {
         if (mesh && mesh.userData.screenMesh) {
           material.map = texture;
           material.color.setHex(0xffffff);
+          material.transparent = false;
+          material.depthWrite = true;
           material.needsUpdate = true;
           this.fitScreenMeshToTexture(mesh.userData.screenMesh, texture);
         } else if (material.map !== texture) {
           material.map = texture;
           material.color.setHex(0xffffff);
+          material.transparent = false;
+          material.depthWrite = true;
           material.needsUpdate = true;
         }
       },
@@ -267,6 +545,8 @@ export class ProjectShowcase {
               if (mu && this.resolveTextureUrl(mu) === url && m.userData.screenMesh) {
                 m.userData.screenMesh.material.map = texture;
                 m.userData.screenMesh.material.color.setHex(0xffffff);
+                m.userData.screenMesh.material.transparent = false;
+                m.userData.screenMesh.material.depthWrite = true;
                 m.userData.screenMesh.material.needsUpdate = true;
                 this.fitScreenMeshToTexture(m.userData.screenMesh, texture);
               }
@@ -301,12 +581,12 @@ export class ProjectShowcase {
 
     // 1. Scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x070b16, 0.045);
+    this.scene.fog = new THREE.FogExp2(0x070b16, 0.024);
 
-    // 2. Camera
-    this.camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-    this.camera.position.set(0, 0.4, 9.4);
-    this.camera.lookAt(0, 0, 0);
+    // 2. Camera - Close-up cinematic framing maximizing monitor visibility in container
+    this.camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 80);
+    this.camera.position.set(0, 0.45, 5.25);
+    this.camera.lookAt(0, 0.05, -0.40);
 
     // 3. Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -318,29 +598,38 @@ export class ProjectShowcase {
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.18;
 
     // 4. Lights
-    const ambientLight = new THREE.AmbientLight(0x22304d, 1.4);
+    const ambientLight = new THREE.AmbientLight(0x20304a, 1.5);
     this.scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
-    keyLight.position.set(0, 8, 6);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    keyLight.position.set(3, 8, 5);
     this.scene.add(keyLight);
 
-    const cyanLight = new THREE.PointLight(0x38bdf8, 3.2, 22);
+    const rimLight = new THREE.DirectionalLight(0x7dd3fc, 1.4);
+    rimLight.position.set(-4, 6, -8);
+    this.scene.add(rimLight);
+
+    const cyanLight = new THREE.PointLight(0x38bdf8, 3.2, 24);
     cyanLight.position.set(-6, 2, 4);
     this.scene.add(cyanLight);
 
-    const amberLight = new THREE.PointLight(0xf59e0b, 2.8, 22);
+    const amberLight = new THREE.PointLight(0xf59e0b, 2.8, 24);
     amberLight.position.set(6, 2, 4);
     this.scene.add(amberLight);
+
+    // Overhead robotic crane spotlight for metallic specular highlights on central mast & pistons
+    this.craneSpotLight = new THREE.PointLight(0xa5f3fc, 3.8, 20);
+    this.craneSpotLight.position.set(0, 5.2, -this.centerRadius);
+    this.scene.add(this.craneSpotLight);
 
     // Initialize shared geometry and material pool
     this.initSharedResources();
 
     // 5. Holographic Floor Grid Platform
-    this.createHoloPlatform();
+    this.createHoloPlatform(this.centerRadius);
 
     // 6. Ambient Floating Dust / Ember Particles
     this.createAmbientParticles();
@@ -349,53 +638,82 @@ export class ProjectShowcase {
     this.cardsGroup = new THREE.Group();
     this.scene.add(this.cardsGroup);
 
-    // Build the 3D cards
+    // Build the 3D cards & central robotic arm
     this.rebuild3DCards();
   }
 
-  createHoloPlatform() {
+  createHoloPlatform(radius = 5.8) {
+    if (this.gridPlatform) {
+      this.scene.remove(this.gridPlatform);
+    }
+
     const platformGroup = new THREE.Group();
-    platformGroup.position.set(0, -1.8, 0);
+    platformGroup.position.set(0, -1.8, -radius);
     platformGroup.rotation.x = -Math.PI / 2;
 
+    const floorRadius = Math.max(7.2, radius + 1.4);
+
     // 1. Center disc grid base (layer 0, depthWrite: false)
-    const discGeo = new THREE.CircleGeometry(5.2, 48);
+    const discGeo = new THREE.CircleGeometry(floorRadius, 48);
     const discMat = new THREE.MeshBasicMaterial({
-      color: 0x070c18,
+      color: 0x050a14,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.80,
       depthWrite: false
     });
     const discMesh = new THREE.Mesh(discGeo, discMat);
     discMesh.position.z = 0;
     platformGroup.add(discMesh);
 
-    // 2. Outer cyan cyber ring (elevated to z = 0.02, depthWrite: false)
-    const ringGeo = new THREE.RingGeometry(5.15, 5.3, 64);
+    // 2. Outer cyan cyber perimeter ring
+    const ringGeo = new THREE.RingGeometry(floorRadius - 0.15, floorRadius, 64);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
       opacity: 0.45,
       side: THREE.DoubleSide,
       depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
       blending: THREE.AdditiveBlending
     });
     const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.position.z = 0.02;
+    ringMesh.position.z = 0.01;
     platformGroup.add(ringMesh);
 
-    // 3. Inner glowing amber ring (elevated to z = 0.04 to eliminate any Z-fighting, depthWrite: false)
-    const innerRingGeo = new THREE.RingGeometry(3.55, 3.68, 64);
+    // 3. Carousel orbit track ring (matching monitor radius)
+    const orbitRingGeo = new THREE.RingGeometry(radius - 0.08, radius + 0.08, 64);
+    const orbitRingMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+      blending: THREE.AdditiveBlending
+    });
+    const orbitRingMesh = new THREE.Mesh(orbitRingGeo, orbitRingMat);
+    orbitRingMesh.position.z = 0.01;
+    platformGroup.add(orbitRingMesh);
+
+    // 4. Inner glowing amber ring
+    const innerRingGeo = new THREE.RingGeometry(2.7, 2.82, 64);
     const innerRingMat = new THREE.MeshBasicMaterial({
       color: 0xf59e0b,
       transparent: true,
       opacity: 0.4,
       side: THREE.DoubleSide,
       depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
       blending: THREE.AdditiveBlending
     });
     const innerRingMesh = new THREE.Mesh(innerRingGeo, innerRingMat);
-    innerRingMesh.position.z = 0.04;
+    innerRingMesh.position.z = 0.01;
     platformGroup.add(innerRingMesh);
 
     this.gridPlatform = platformGroup;
@@ -440,6 +758,573 @@ export class ProjectShowcase {
     this.scene.add(this.particleSystem);
   }
 
+  /* -------------------------------------------------------------------------- */
+  /*                 CENTRAL MECHANICAL ARM & ARTICULATED SUB-ARMS              */
+  /* -------------------------------------------------------------------------- */
+
+  disposeRobotSystem() {
+    if (this.robotBaseGroup) {
+      this.robotBaseGroup.traverse(child => {
+        if (child.isMesh) {
+          if (child.geometry && !Object.values(this.sharedGeometries).includes(child.geometry)) {
+            child.geometry.dispose();
+          }
+        }
+      });
+    }
+  }
+
+  createCentralMechanicalSystem(radius, total) {
+    if (this.robotBaseGroup) {
+      this.scene.remove(this.robotBaseGroup);
+      this.disposeRobotSystem();
+      this.robotBaseGroup = null;
+      this.robotTurret = null;
+      this.subArmMeshes = [];
+    }
+
+    this.centerRadius = radius;
+    const baseGroup = new THREE.Group();
+    baseGroup.position.set(0, -1.8, -radius);
+
+    // Foundation Base Flange (Heavy industrial octagonal base)
+    const baseFlangeGeo = new THREE.CylinderGeometry(2.3, 2.5, 0.16, 24);
+    const baseFlangeMesh = new THREE.Mesh(baseFlangeGeo, this.sharedMaterials.armDark);
+    baseFlangeMesh.position.y = 0.08;
+    baseGroup.add(baseFlangeMesh);
+
+    // Hazard Caution Perimeter Ring on top of flange
+    const hazardRingGeo = new THREE.RingGeometry(1.85, 2.2, 32);
+    const hazardRingMesh = new THREE.Mesh(hazardRingGeo, this.sharedMaterials.hazardRing);
+    hazardRingMesh.rotation.x = -Math.PI / 2;
+    hazardRingMesh.position.y = 0.165;
+    baseGroup.add(hazardRingMesh);
+
+    // 8 Industrial Hex Anchor Bolts around the flange
+    for (let i = 0; i < 8; i++) {
+      const bAngle = (i / 8) * Math.PI * 2;
+      const boltMesh = new THREE.Mesh(this.sharedGeometries.hexBolt, this.sharedMaterials.chrome);
+      boltMesh.position.set(Math.cos(bAngle) * 2.05, 0.18, Math.sin(bAngle) * 2.05);
+      baseGroup.add(boltMesh);
+    }
+
+    // 4 Heavy-duty Angled Outrigger Stabilizers
+    for (let i = 0; i < 4; i++) {
+      const oAngle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const outrigger = new THREE.Group();
+      outrigger.rotation.y = oAngle;
+
+      const legGeo = new THREE.BoxGeometry(0.24, 0.16, 1.4);
+      const legMesh = new THREE.Mesh(legGeo, this.sharedMaterials.armSteel);
+      legMesh.position.set(0, 0.12, 1.9);
+      legMesh.rotation.x = 0.15;
+      outrigger.add(legMesh);
+
+      const footGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.1, 16);
+      const footMesh = new THREE.Mesh(footGeo, this.sharedMaterials.armDark);
+      footMesh.position.set(0, 0.05, 2.5);
+      outrigger.add(footMesh);
+
+      baseGroup.add(outrigger);
+    }
+
+    // Rotating Turntable Gear Ring
+    const gearGroup = new THREE.Group();
+    gearGroup.position.y = 0.22;
+    const gearBaseGeo = new THREE.CylinderGeometry(1.5, 1.55, 0.16, 32);
+    const gearBaseMesh = new THREE.Mesh(gearBaseGeo, this.sharedMaterials.armSteel);
+    gearGroup.add(gearBaseMesh);
+
+    // 16 Gear Teeth on perimeter
+    const toothGeo = new THREE.BoxGeometry(0.08, 0.16, 0.14);
+    for (let t = 0; t < 16; t++) {
+      const tAngle = (t / 16) * Math.PI * 2;
+      const tooth = new THREE.Mesh(toothGeo, this.sharedMaterials.chrome);
+      tooth.position.set(Math.sin(tAngle) * 1.54, 0, Math.cos(tAngle) * 1.54);
+      tooth.rotation.y = tAngle;
+      gearGroup.add(tooth);
+    }
+
+    // Glowing Concentric Circuit Track Rings on turntable
+    const trackRingGeo = new THREE.RingGeometry(1.15, 1.25, 48);
+    const trackRingMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide
+    });
+    const trackRingMesh = new THREE.Mesh(trackRingGeo, trackRingMat);
+    trackRingMesh.rotation.x = -Math.PI / 2;
+    trackRingMesh.position.y = 0.085;
+    gearGroup.add(trackRingMesh);
+
+    baseGroup.add(gearGroup);
+    this.turntableGear = gearGroup;
+
+    // Main Robotic Column (Lower Mast)
+    const mastGeo = new THREE.CylinderGeometry(0.72, 0.88, 1.35, 24);
+    const mastMesh = new THREE.Mesh(mastGeo, this.sharedMaterials.armDark);
+    mastMesh.position.y = 0.95;
+    baseGroup.add(mastMesh);
+
+    // 4 Hydraulic Actuator Pistons bracing the lower mast
+    for (let p = 0; p < 4; p++) {
+      const pAngle = (p / 4) * Math.PI * 2;
+      const pistonGroup = new THREE.Group();
+      pistonGroup.rotation.y = pAngle;
+
+      // Lower Barrel
+      const barrelGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.85, 12);
+      const barrelMesh = new THREE.Mesh(barrelGeo, this.sharedMaterials.armSteel);
+      barrelMesh.position.set(0, 0.65, 1.15);
+      barrelMesh.rotation.x = -0.38;
+      pistonGroup.add(barrelMesh);
+
+      // Chrome Rod sliding into mast collar
+      const rodGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.75, 12);
+      const rodMesh = new THREE.Mesh(rodGeo, this.sharedMaterials.chrome);
+      rodMesh.position.set(0, 1.05, 0.95);
+      rodMesh.rotation.x = -0.38;
+      pistonGroup.add(rodMesh);
+
+      baseGroup.add(pistonGroup);
+    }
+
+    // Central Glowing Reactor Core
+    const coreCylinderGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.55, 24);
+    this.reactorCoreMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.85
+    });
+    const coreMesh = new THREE.Mesh(coreCylinderGeo, this.reactorCoreMat);
+    coreMesh.position.y = 1.85;
+    baseGroup.add(coreMesh);
+
+    // 6 Vertical Protective Titanium Cage Bars
+    const cageBarGeo = new THREE.BoxGeometry(0.05, 0.60, 0.06);
+    for (let c = 0; c < 6; c++) {
+      const cAngle = (c / 6) * Math.PI * 2;
+      const bar = new THREE.Mesh(cageBarGeo, this.sharedMaterials.armSteel);
+      bar.position.set(Math.sin(cAngle) * 0.50, 1.85, Math.cos(cAngle) * 0.50);
+      baseGroup.add(bar);
+    }
+
+    // Core PointLight giving dramatic inner glow
+    this.coreLight = new THREE.PointLight(0x38bdf8, 2.5, 9);
+    this.coreLight.position.set(0, 1.85, 0);
+    baseGroup.add(this.coreLight);
+
+    // Upper Mast Telescoping Sleeve
+    const upperMastGeo = new THREE.CylinderGeometry(0.58, 0.64, 0.50, 24);
+    const upperMastMesh = new THREE.Mesh(upperMastGeo, this.sharedMaterials.armSteel);
+    upperMastMesh.position.y = 2.30;
+    baseGroup.add(upperMastMesh);
+
+    // Rotating Central Turret (The Distribution Masthead)
+    this.robotTurret = new THREE.Group();
+    this.robotTurret.position.y = 2.50;
+
+    // Turret Servo Housing
+    const turretGeo = new THREE.CylinderGeometry(0.78, 0.68, 0.48, 16);
+    const turretMesh = new THREE.Mesh(turretGeo, this.sharedMaterials.armDark);
+    this.robotTurret.add(turretMesh);
+
+    // Top Crown Sensor Mast & Blinking Beacon
+    const mastPinGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.65, 12);
+    const mastPin = new THREE.Mesh(mastPinGeo, this.sharedMaterials.chrome);
+    mastPin.position.y = 0.55;
+    this.robotTurret.add(mastPin);
+
+    // Blinking Warning Beacon Lens
+    const beaconGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.18, 16);
+    this.beaconMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+    const beaconMesh = new THREE.Mesh(beaconGeo, this.beaconMat);
+    beaconMesh.position.y = 0.92;
+    this.robotTurret.add(beaconMesh);
+
+    this.beaconLight = new THREE.PointLight(0xf59e0b, 2.0, 7);
+    this.beaconLight.position.y = 0.95;
+    this.robotTurret.add(this.beaconLight);
+
+    // Build the Articulated Sub-Arms for each project
+    this.subArmMeshes = [];
+    for (let i = 0; i < total; i++) {
+      const armRig = this.buildSubArmRig(i, total, radius);
+      this.robotTurret.add(armRig);
+      this.subArmMeshes.push(armRig);
+    }
+
+    baseGroup.add(this.robotTurret);
+    this.robotBaseGroup = baseGroup;
+    this.scene.add(baseGroup);
+  }
+
+  buildSubArmRig(idx, total, radius) {
+    const baseAngle = (idx / total) * Math.PI * 2;
+    const armRig = new THREE.Group();
+    armRig.rotation.y = baseAngle;
+
+    const shoulderZ = 0.65;
+    const shoulderY = 0.05;
+    const elbowZ = 2.30;
+    const elbowY = 0.65;
+    const wristZ = radius - 0.25;
+    const wristY = -0.70; // Reaches from elevated turret down to monitor center
+
+    // 1. Sleek Radial Shoulder Servo Hub
+    const shoulderMountGeo = new THREE.BoxGeometry(0.30, 0.32, 0.26);
+    const shoulderMount = new THREE.Mesh(shoulderMountGeo, this.sharedMaterials.armDark);
+    shoulderMount.position.set(0, shoulderY, shoulderZ - 0.12);
+    armRig.add(shoulderMount);
+
+    // Shoulder Pivot Servo Joint
+    const shoulderPivot = new THREE.Mesh(this.sharedGeometries.armPivot, this.sharedMaterials.armSteel);
+    shoulderPivot.rotation.z = Math.PI / 2;
+    shoulderPivot.position.set(0, shoulderY, shoulderZ);
+    armRig.add(shoulderPivot);
+
+    const capL = new THREE.Mesh(this.sharedGeometries.armCap, this.sharedMaterials.chrome);
+    capL.rotation.z = Math.PI / 2;
+    capL.position.set(0.15, shoulderY, shoulderZ);
+    armRig.add(capL);
+
+    const capR = new THREE.Mesh(this.sharedGeometries.armCap, this.sharedMaterials.chrome);
+    capR.rotation.z = Math.PI / 2;
+    capR.position.set(-0.15, shoulderY, shoulderZ);
+    armRig.add(capR);
+
+    // 2. Primary Upper Boom (Sleek Tapered Titanium Robotic Spar)
+    const boom1Len = Math.hypot(elbowZ - shoulderZ, elbowY - shoulderY);
+    const boom1Angle = Math.atan2(elbowY - shoulderY, elbowZ - shoulderZ);
+    const boom1MidZ = (shoulderZ + elbowZ) / 2;
+    const boom1MidY = (shoulderY + elbowY) / 2;
+
+    const boom1Group = new THREE.Group();
+    boom1Group.position.set(0, boom1MidY, boom1MidZ);
+    boom1Group.rotation.x = -boom1Angle;
+
+    const sparGeo = new THREE.BoxGeometry(0.16, 0.14, boom1Len);
+    const boom1Mesh = new THREE.Mesh(sparGeo, this.sharedMaterials.armDark);
+    boom1Group.add(boom1Mesh);
+
+    // Inset cyber accent line along the top ridge
+    const cyberLineGeo = new THREE.BoxGeometry(0.04, 0.02, boom1Len * 0.85);
+    const cyberLine = new THREE.Mesh(cyberLineGeo, this.sharedMaterials.armCyberLine);
+    cyberLine.position.y = 0.075;
+    boom1Group.add(cyberLine);
+
+    armRig.add(boom1Group);
+
+    // 3. Articulated Elbow Pivot Joint
+    const elbowPivot = new THREE.Mesh(this.sharedGeometries.armPivot, this.sharedMaterials.armSteel);
+    elbowPivot.rotation.z = Math.PI / 2;
+    elbowPivot.position.set(0, elbowY, elbowZ);
+    armRig.add(elbowPivot);
+
+    const elbowCap = new THREE.Mesh(this.sharedGeometries.armCap, this.sharedMaterials.chrome);
+    elbowCap.rotation.z = Math.PI / 2;
+    elbowCap.position.set(0.15, elbowY, elbowZ);
+    armRig.add(elbowCap);
+
+    // Glowing Cyan Status Indicator on Elbow
+    const elbowLedMesh = new THREE.Mesh(this.sharedGeometries.activityLed, this.sharedMaterials.ledCyan);
+    elbowLedMesh.position.set(0.17, elbowY, elbowZ);
+    armRig.add(elbowLedMesh);
+
+    // 4. Secondary Forearm Cantilever (Extends directly to monitor wrist)
+    const boom2Len = Math.hypot(wristZ - elbowZ, wristY - elbowY);
+    const boom2Angle = Math.atan2(wristY - elbowY, wristZ - elbowZ);
+    const boom2MidZ = (elbowZ + wristZ) / 2;
+    const boom2MidY = (elbowY + wristY) / 2;
+
+    const boom2Group = new THREE.Group();
+    boom2Group.position.set(0, boom2MidY, boom2MidZ);
+    boom2Group.rotation.x = -boom2Angle;
+
+    const fSparGeo = new THREE.BoxGeometry(0.14, 0.12, boom2Len);
+    const boom2Mesh = new THREE.Mesh(fSparGeo, this.sharedMaterials.armDark);
+    boom2Group.add(boom2Mesh);
+
+    // Titanium structural reinforcement flange
+    const flangeGeo = new THREE.BoxGeometry(0.02, 0.06, boom2Len * 0.7);
+    const flangeMesh = new THREE.Mesh(flangeGeo, this.sharedMaterials.armSteel);
+    flangeMesh.position.y = -0.04;
+    boom2Group.add(flangeMesh);
+
+    armRig.add(boom2Group);
+
+    // 5. Wrist Gimbal & VESA Mount Bracket
+    const wristGroup = new THREE.Group();
+    wristGroup.position.set(0, wristY, wristZ);
+
+    const ballMesh = new THREE.Mesh(this.sharedGeometries.ballGimbal, this.sharedMaterials.chrome);
+    wristGroup.add(ballMesh);
+
+    const collarMesh = new THREE.Mesh(this.sharedGeometries.gimbalCollar, this.sharedMaterials.armSteel);
+    collarMesh.rotation.x = Math.PI / 2;
+    collarMesh.position.z = -0.05;
+    wristGroup.add(collarMesh);
+
+    const bracketMesh = new THREE.Mesh(this.sharedGeometries.vesaPlate, this.sharedMaterials.vesaSteel);
+    bracketMesh.position.z = 0.03;
+    wristGroup.add(bracketMesh);
+
+    // 4 Corner Hex Bolts clamping onto monitor back
+    const boltOffset = 0.35;
+    const bolts = [
+      [-boltOffset, -boltOffset],
+      [boltOffset, -boltOffset],
+      [-boltOffset, boltOffset],
+      [boltOffset, boltOffset]
+    ];
+    bolts.forEach(([bx, by]) => {
+      const bMesh = new THREE.Mesh(this.sharedGeometries.hexBolt, this.sharedMaterials.chrome);
+      bMesh.rotation.x = Math.PI / 2;
+      bMesh.position.set(bx, by, 0.055);
+      wristGroup.add(bMesh);
+    });
+
+    armRig.add(wristGroup);
+
+    // 6. Smooth Flexible Cable Umbilical
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.14, shoulderY - 0.02, shoulderZ + 0.1),
+      new THREE.Vector3(0.18, shoulderY + 0.15, shoulderZ + 0.7),
+      new THREE.Vector3(0.15, elbowY - 0.06, elbowZ - 0.1),
+      new THREE.Vector3(0.16, (elbowY + wristY) * 0.5 - 0.10, (elbowZ + wristZ) * 0.5),
+      new THREE.Vector3(0.10, wristY + 0.04, wristZ - 0.04)
+    ]);
+    const tubeGeo = new THREE.TubeGeometry(curve, 18, 0.024, 8, false);
+    const tubeMesh = new THREE.Mesh(tubeGeo, this.sharedMaterials.cableRubber);
+    armRig.add(tubeMesh);
+
+    armRig.userData = {
+      idx,
+      baseAngle,
+      wristGroup,
+      isHovered: false
+    };
+
+    return armRig;
+  }
+
+  buildMonitorCard(project, idx, total, radius) {
+    const cardGroup = new THREE.Group();
+    const isStarred = project.badge && project.badge.includes('★');
+    const isHardware = project.category === 'hardware';
+    const accentColor = isStarred ? 0xffaa33 : (isHardware ? 0x10b981 : 0x38bdf8);
+
+    const haloMat = isStarred
+      ? this.sharedMaterials.haloAmber
+      : (isHardware ? this.sharedMaterials.haloGreen : this.sharedMaterials.haloCyan);
+
+    const ledMat = isStarred
+      ? this.sharedMaterials.ledAmber
+      : (isHardware ? this.sharedMaterials.ledGreen : this.sharedMaterials.ledCyan);
+
+    const monitorBody = new THREE.Group();
+
+    // 1. Monitor Chassis (Beveled housing set back to create authentic recessed screen pocket)
+    const chassisMesh = new THREE.Mesh(this.sharedGeometries.chassis, this.sharedMaterials.chassis);
+    chassisMesh.position.set(0, 0, -0.06);
+    monitorBody.add(chassisMesh);
+
+    // 2. Cyber Glowing Edge Wireframe
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: accentColor,
+      transparent: true,
+      opacity: 0.55
+    });
+    const edgeLines = new THREE.LineSegments(this.sharedGeometries.edges, edgeMat);
+    edgeLines.position.set(0, 0, -0.06);
+    monitorBody.add(edgeLines);
+
+    // 3. Top Rim Ventilation Slits
+    const slatGeo = new THREE.BoxGeometry(0.7, 0.02, 0.08);
+    for (let s = -2; s <= 2; s++) {
+      if (s === 0) continue;
+      const slat = new THREE.Mesh(slatGeo, this.sharedMaterials.chassisAccent);
+      slat.position.set(s * 0.9, 1.29, -0.06);
+      monitorBody.add(slat);
+    }
+
+    // 4. Solid Matte Screen Cavity Backing Plate (eliminates black gaps when aspect ratio varies)
+    const screenBackingMesh = new THREE.Mesh(
+      this.sharedGeometries.screenBacking,
+      this.sharedMaterials.screenBacking
+    );
+    screenBackingMesh.position.set(0, 0.05, 0.035);
+    monitorBody.add(screenBackingMesh);
+
+    // 5. Active Recessed Screen Display (Opaque panel with depth write, zero Z-fighting)
+    let screenMat;
+    const screenshotUrl = this.resolveTextureUrl(project.screenshots?.[0]?.url);
+    if (screenshotUrl && this.textureCache.has(screenshotUrl)) {
+      screenMat = new THREE.MeshBasicMaterial({
+        map: this.textureCache.get(screenshotUrl),
+        toneMapped: false,
+        transparent: false,
+        depthWrite: true
+      });
+    } else if (screenshotUrl) {
+      screenMat = new THREE.MeshBasicMaterial({
+        color: 0x0a1322,
+        transparent: false,
+        depthWrite: true
+      });
+      this.loadCardTexture(screenshotUrl, screenMat);
+    } else {
+      screenMat = new THREE.MeshBasicMaterial({
+        color: 0x0d1728,
+        transparent: false,
+        depthWrite: true
+      });
+    }
+
+    const screenMesh = new THREE.Mesh(this.sharedGeometries.screen, screenMat);
+    screenMesh.position.set(0, 0.05, 0.045);
+    if (screenMat.map) {
+      this.fitScreenMeshToTexture(screenMesh, screenMat.map);
+    }
+    monitorBody.add(screenMesh);
+
+    // Tactical HUD Corner Reticles Overlay (with polygonOffset to prevent depth fighting)
+    const hudMesh = new THREE.Mesh(this.sharedGeometries.screenOverlay, this.sharedMaterials.screenHud);
+    hudMesh.position.set(0, 0.05, 0.048);
+    monitorBody.add(hudMesh);
+
+    // Anti-Glare Glass Sheen
+    const glossMesh = new THREE.Mesh(this.sharedGeometries.screenOverlay, this.sharedMaterials.glassGloss);
+    glossMesh.position.set(0, 0.05, 0.050);
+    monitorBody.add(glossMesh);
+
+    // 6. Raised Physical Bezel Frame (protrudes in front of screen, creating genuine recessed bezel casing)
+    // Bottom Chin Bar
+    const chinMesh = new THREE.Mesh(this.sharedGeometries.bezelChin, this.sharedMaterials.bezelChin);
+    chinMesh.position.set(0, -1.18, 0.055);
+    monitorBody.add(chinMesh);
+
+    // Top Bezel Bar
+    const topBezelMesh = new THREE.Mesh(this.sharedGeometries.bezelTop, this.sharedMaterials.bezelChin);
+    topBezelMesh.position.set(0, 1.24, 0.055);
+    monitorBody.add(topBezelMesh);
+
+    // Left and Right Side Bezel Bars
+    const leftBezelMesh = new THREE.Mesh(this.sharedGeometries.bezelSide, this.sharedMaterials.bezelChin);
+    leftBezelMesh.position.set(-2.14, 0.05, 0.055);
+    monitorBody.add(leftBezelMesh);
+
+    const rightBezelMesh = new THREE.Mesh(this.sharedGeometries.bezelSide, this.sharedMaterials.bezelChin);
+    rightBezelMesh.position.set(2.14, 0.05, 0.055);
+    monitorBody.add(rightBezelMesh);
+
+    // Power Indicator LED on bottom chin
+    const ledMesh = new THREE.Mesh(this.sharedGeometries.led, ledMat);
+    ledMesh.position.set(1.92, -1.18, 0.08);
+    monitorBody.add(ledMesh);
+
+    // Data Activity LED on bottom chin (blinks dynamically)
+    const activityLed = new THREE.Mesh(this.sharedGeometries.activityLed, this.sharedMaterials.ledCyan);
+    activityLed.position.set(1.78, -1.18, 0.08);
+    monitorBody.add(activityLed);
+
+    // Chin Brand Inset Plate
+    const badgeGeo = new THREE.BoxGeometry(0.9, 0.08, 0.02);
+    const badgeMesh = new THREE.Mesh(badgeGeo, this.sharedMaterials.chrome);
+    badgeMesh.position.set(0, -1.18, 0.08);
+    monitorBody.add(badgeMesh);
+
+    // 7. Projected Ambient Backlight Glow (Ambilight Halo)
+    const haloMesh = new THREE.Mesh(this.sharedGeometries.glowHalo, haloMat.clone());
+    haloMesh.position.set(0, 0, -0.16);
+    monitorBody.add(haloMesh);
+
+    // 8. Rear Electronics Backpack Housing
+    const rearMesh = new THREE.Mesh(this.sharedGeometries.rearHousing, this.sharedMaterials.chassisAccent);
+    rearMesh.position.set(0, 0, -0.19);
+    monitorBody.add(rearMesh);
+
+    // Tech Serial & Barcode Decal on backpack
+    const labelMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.2, 0.6),
+      this.sharedMaterials.rearLabel
+    );
+    labelMesh.rotation.y = Math.PI;
+    labelMesh.position.set(-0.35, 0.25, -0.265);
+    monitorBody.add(labelMesh);
+
+    // Rear Cooling Louvers on backpack
+    const louverGeo = new THREE.BoxGeometry(1.5, 0.025, 0.02);
+    for (let l = 0; l < 4; l++) {
+      const louver = new THREE.Mesh(louverGeo, this.sharedMaterials.armSteel);
+      louver.position.set(0, -0.15 - l * 0.08, -0.265);
+      monitorBody.add(louver);
+    }
+
+    // I/O Bay Slot & Cable Connector Plug
+    const ioMesh = new THREE.Mesh(this.sharedGeometries.ioBay, this.sharedMaterials.armDark);
+    ioMesh.position.set(0.35, -0.50, -0.26);
+    monitorBody.add(ioMesh);
+
+    const cableHeadMesh = new THREE.Mesh(this.sharedGeometries.cableHead, this.sharedMaterials.cableRubber);
+    cableHeadMesh.position.set(0.14, -0.50, -0.28);
+    monitorBody.add(cableHeadMesh);
+
+    // Rear VESA Mount Plate on Monitor Back (matches arm wrist mount)
+    const vesaMesh = new THREE.Mesh(this.sharedGeometries.vesaPlate, this.sharedMaterials.vesaSteel);
+    vesaMesh.position.set(0, 0, -0.26);
+    monitorBody.add(vesaMesh);
+
+    // 4 Corner Bolts on Monitor VESA Plate
+    const boltOffset = 0.35;
+    const bolts = [
+      [-boltOffset, -boltOffset],
+      [boltOffset, -boltOffset],
+      [-boltOffset, boltOffset],
+      [boltOffset, boltOffset]
+    ];
+    bolts.forEach(([bx, by]) => {
+      const bMesh = new THREE.Mesh(this.sharedGeometries.hexBolt, this.sharedMaterials.chrome);
+      bMesh.rotation.x = Math.PI / 2;
+      bMesh.position.set(bx, by, -0.285);
+      monitorBody.add(bMesh);
+    });
+
+    // Central Ball Gimbal Collar Socket
+    const socketGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.12, 16);
+    const socketMesh = new THREE.Mesh(socketGeo, this.sharedMaterials.armSteel);
+    socketMesh.rotation.x = Math.PI / 2;
+    socketMesh.position.set(0, 0, -0.29);
+    monitorBody.add(socketMesh);
+
+    cardGroup.add(monitorBody);
+
+    // Metadata
+    const angle = (idx / total) * Math.PI * 2;
+    cardGroup.userData = {
+      project,
+      index: idx,
+      baseAngle: angle,
+      monitorBody,
+      screenMesh,
+      edgeLines,
+      haloMesh,
+      activityLed,
+      hoverOffset: 0
+    };
+
+    // Position along carousel circle
+    cardGroup.position.set(
+      Math.sin(angle) * radius,
+      0,
+      Math.cos(angle) * radius - radius
+    );
+    cardGroup.rotation.y = angle;
+
+    return cardGroup;
+  }
+
   rebuild3DCards() {
     if (!this.cardsGroup) return;
 
@@ -453,90 +1338,40 @@ export class ProjectShowcase {
       if (obj.userData?.edgeLines?.material) {
         obj.userData.edgeLines.material.dispose();
       }
+      if (obj.userData?.haloMesh?.material) {
+        obj.userData.haloMesh.material.dispose();
+      }
     }
     this.cardMeshes = [];
 
     const total = this.filteredProjects.length;
-    if (total === 0) return;
+    if (total === 0) {
+      if (this.robotBaseGroup) {
+        this.scene.remove(this.robotBaseGroup);
+        this.disposeRobotSystem();
+        this.robotBaseGroup = null;
+        this.robotTurret = null;
+        this.subArmMeshes = [];
+      }
+      return;
+    }
 
     const radius = Math.max(5.8, total * 0.78);
-    const cardWidth = 4.2;
-    const cardHeight = 2.45;
-    const cardDepth = 0.08;
+    this.centerRadius = radius;
 
+    if (this.craneSpotLight) {
+      this.craneSpotLight.position.set(0, 5.2, -radius);
+    }
+
+    // 1. Rebuild or adjust Holographic Floor Platform for this radius
+    this.createHoloPlatform(radius);
+
+    // 2. Build Central Mechanical Robotic Arm System & Articulated Sub-Arms
+    this.createCentralMechanicalSystem(radius, total);
+
+    // 3. Build Proper Realistic Monitors for each project
     this.filteredProjects.forEach((project, idx) => {
-      const cardGroup = new THREE.Group();
-      cardGroup.userData = {
-        project,
-        index: idx,
-        baseScale: 1.0,
-        hoverScale: 1.05
-      };
-
-      // 1. Card Chassis (Chamfered look using shared chassis geometry and material)
-      const chassisMesh = new THREE.Mesh(this.sharedGeometries.chassis, this.sharedMaterials.chassis);
-      cardGroup.add(chassisMesh);
-
-      // 2. Cyber Glowing Edge Wireframe (using shared edge geometry)
-      const isStarred = project.badge && project.badge.includes('★');
-      const edgeColor = isStarred ? 0xffaa33 : (project.category === 'hardware' ? 0x10b981 : 0x38bdf8);
-      const edgeMat = new THREE.LineBasicMaterial({
-        color: edgeColor,
-        transparent: true,
-        opacity: 0.55
-      });
-      const edgeLines = new THREE.LineSegments(this.sharedGeometries.edges, edgeMat);
-      cardGroup.add(edgeLines);
-
-      // 3. Screen Plane with Screenshot Texture (aspect-preserving contain fit)
-      // NOTE: transparent:true is set once here so the per-frame loop only
-      // writes opacity (no material program/state churn per frame)
-      let screenMat;
-      const screenshotUrl = this.resolveTextureUrl(project.screenshots?.[0]?.url);
-      if (screenshotUrl && this.textureCache.has(screenshotUrl)) {
-        screenMat = new THREE.MeshBasicMaterial({
-          map: this.textureCache.get(screenshotUrl),
-          toneMapped: false,
-          transparent: true
-        });
-      } else if (screenshotUrl) {
-        screenMat = new THREE.MeshBasicMaterial({
-          color: 0x111c30,
-          transparent: true
-        });
-        this.loadCardTexture(screenshotUrl, screenMat);
-      } else {
-        screenMat = new THREE.MeshBasicMaterial({ color: 0x13213a, transparent: true });
-      }
-
-      const screenMesh = new THREE.Mesh(this.sharedGeometries.screen, screenMat);
-      screenMesh.position.z = cardDepth / 2 + 0.005;
-      // Apply aspect-correct fit immediately for cached textures
-      if (screenMat.map) {
-        this.fitScreenMeshToTexture(screenMesh, screenMat.map);
-      }
-      cardGroup.add(screenMesh);
-      cardGroup.userData.screenMesh = screenMesh;
-      cardGroup.userData.edgeLines = edgeLines;
-
-      // 4. Status Indicator Glow Sphere on top right (using shared LED geometry and materials)
-      const ledMat = isStarred
-        ? this.sharedMaterials.ledAmber
-        : (project.category === 'hardware' ? this.sharedMaterials.ledGreen : this.sharedMaterials.ledCyan);
-      const ledMesh = new THREE.Mesh(this.sharedGeometries.led, ledMat);
-      ledMesh.position.set(cardWidth / 2 - 0.22, cardHeight / 2 - 0.22, cardDepth / 2 + 0.02);
-      cardGroup.add(ledMesh);
-
-      // Position along the circular carousel arc
-      const angle = (idx / total) * Math.PI * 2;
-      cardGroup.userData.baseAngle = angle;
-      cardGroup.position.set(
-        Math.sin(angle) * radius,
-        0,
-        Math.cos(angle) * radius - radius
-      );
-      cardGroup.rotation.y = angle;
-
+      const cardGroup = this.buildMonitorCard(project, idx, total, radius);
       this.cardsGroup.add(cardGroup);
       this.cardMeshes.push(cardGroup);
     });
@@ -552,7 +1387,7 @@ export class ProjectShowcase {
     const total = this.filteredProjects.length;
     if (total === 0 || !this.cardsGroup) return;
 
-    const radius = Math.max(5.8, total * 0.78);
+    const radius = this.centerRadius || Math.max(5.8, total * 0.78);
 
     this.cardMeshes.forEach((cardGroup, idx) => {
       const baseAngle = (idx / total) * Math.PI * 2;
@@ -570,16 +1405,24 @@ export class ProjectShowcase {
 
       const dist = normAngle / Math.PI; // 0 (front) to 1 (back)
 
-      // Slight depth scale and opacity falloff
-      const depthScale = THREE.MathUtils.lerp(1.0, 0.78, dist);
       const isHovered = (this.hoveredCardMesh === cardGroup);
-      const finalScale = isHovered ? depthScale * 1.06 : depthScale;
 
-      cardGroup.scale.set(finalScale, finalScale, finalScale);
+      // Playful forward presentation offset on hover & active card
+      const targetHoverOffset = isHovered ? 0.25 : (dist < 0.08 ? 0.08 : 0);
+      const curOffset = cardGroup.userData.hoverOffset || 0;
+      const newOffset = THREE.MathUtils.lerp(curOffset, targetHoverOffset, 0.15);
+      cardGroup.userData.hoverOffset = newOffset;
 
-      // Soft opacity adjustment on screen (transparent flag set once at creation)
-      if (cardGroup.userData.screenMesh && cardGroup.userData.screenMesh.material) {
-        cardGroup.userData.screenMesh.material.opacity = THREE.MathUtils.lerp(1.0, 0.45, dist);
+      if (cardGroup.userData.monitorBody) {
+        cardGroup.userData.monitorBody.position.z = newOffset;
+        cardGroup.userData.monitorBody.position.y = newOffset * 0.2;
+      }
+
+      // Synchronize matching sub-arm kinematic extension
+      const matchingArm = this.subArmMeshes?.[idx];
+      if (matchingArm) {
+        matchingArm.position.z = newOffset;
+        matchingArm.userData.isHovered = isHovered;
       }
 
       // Edge line brightness
@@ -587,6 +1430,13 @@ export class ProjectShowcase {
         cardGroup.userData.edgeLines.material.opacity = isHovered
           ? 0.95
           : THREE.MathUtils.lerp(0.65, 0.2, dist);
+      }
+
+      // Backlight Ambilight halo brightness
+      if (cardGroup.userData.haloMesh && cardGroup.userData.haloMesh.material) {
+        cardGroup.userData.haloMesh.material.opacity = isHovered
+          ? 0.55
+          : THREE.MathUtils.lerp(0.28, 0.08, dist);
       }
     });
   }
@@ -799,14 +1649,20 @@ export class ProjectShowcase {
     if (width === 0 || height === 0) return;
 
     this.canvasRect = this.canvas.getBoundingClientRect();
-    this.camera.aspect = width / height;
+    const aspect = width / height;
+    this.camera.aspect = aspect;
 
     if (width < 640) {
-      this.camera.fov = 44;
-      this.camera.position.z = 10.4;
+      this.camera.fov = 42;
+      this.camera.position.set(0, 0.50, 6.2);
+      this.camera.lookAt(0, 0.05, -0.40);
     } else {
-      this.camera.fov = 38;
-      this.camera.position.z = 9.4;
+      // Responsive close-up camera distance based on container aspect ratio
+      // Maximizes monitor display visibility within the container
+      const targetZ = Math.max(4.9, Math.min(5.7, 5.15 + (2.3 - aspect) * 0.7));
+      this.camera.fov = 36;
+      this.camera.position.set(0, 0.45, targetZ);
+      this.camera.lookAt(0, 0.05, -0.40);
     }
 
     this.camera.updateProjectionMatrix();
@@ -1601,7 +2457,52 @@ export class ProjectShowcase {
       this.particleSystem.position.y = Math.sin(elapsedTime * 0.45) * 0.18;
     }
 
-    // 5. Slowly rotate holographic floor ring
+    // 5. Synchronize central robot turret & floor turntable with carousel rotation
+    if (this.robotTurret) {
+      this.robotTurret.rotation.y = this.currentRotation;
+    }
+
+    if (this.turntableGear) {
+      this.turntableGear.rotation.y = this.currentRotation * 0.35 + elapsedTime * 0.03;
+    }
+
+    // Central reactor core organic pulse
+    if (this.reactorCoreMat) {
+      const corePulse = 0.70 + Math.sin(elapsedTime * 2.8) * 0.30;
+      this.reactorCoreMat.opacity = corePulse;
+      if (this.coreLight) this.coreLight.intensity = 1.8 + corePulse * 1.2;
+    }
+
+    // Top crown warning beacon rhythmic blink
+    if (this.beaconMat) {
+      const beaconOn = Math.sin(elapsedTime * 5.5) > 0.3;
+      this.beaconMat.color.setHex(beaconOn ? 0xf59e0b : 0x553000);
+      if (this.beaconLight) this.beaconLight.intensity = beaconOn ? 2.2 : 0.2;
+    }
+
+    // Alive robotic arm micro-breathing & monitor activity LED pulsing
+    if (this.cardMeshes && this.cardMeshes.length > 0) {
+      for (let i = 0; i < this.cardMeshes.length; i++) {
+        const card = this.cardMeshes[i];
+        const isHovered = (this.hoveredCardMesh === card);
+
+        // Data activity LED blink on monitor chin
+        if (card.userData?.activityLed?.material) {
+          const blinkRate = isHovered ? 18.0 : 4.0;
+          const isLedOn = Math.sin(elapsedTime * blinkRate + i * 1.5) > 0.2;
+          card.userData.activityLed.material.color.setHex(isLedOn ? 0x38bdf8 : 0x071526);
+        }
+
+        // Playful harmonic micro-breathing on sub-arms
+        const subArm = this.subArmMeshes?.[i];
+        if (subArm) {
+          const breath = Math.sin(elapsedTime * 1.6 + i * 0.8) * 0.015;
+          subArm.position.y = breath;
+        }
+      }
+    }
+
+    // Slowly rotate holographic floor ring
     if (this.gridPlatform) {
       this.gridPlatform.rotation.z = elapsedTime * 0.08;
     }
@@ -1664,6 +2565,12 @@ export class ProjectShowcase {
     this.cleanupListeners.forEach(cleanup => cleanup && cleanup());
     this.cleanupListeners = [];
 
+    // Dispose robotic system
+    this.disposeRobotSystem();
+    this.robotBaseGroup = null;
+    this.robotTurret = null;
+    this.subArmMeshes = [];
+
     // Dispose scene meshes
     if (this.cardsGroup) {
       while (this.cardsGroup.children.length > 0) {
@@ -1671,6 +2578,7 @@ export class ProjectShowcase {
         this.cardsGroup.remove(obj);
         if (obj.userData?.screenMesh?.material) obj.userData.screenMesh.material.dispose();
         if (obj.userData?.edgeLines?.material) obj.userData.edgeLines.material.dispose();
+        if (obj.userData?.haloMesh?.material) obj.userData.haloMesh.material.dispose();
       }
     }
 
