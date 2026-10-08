@@ -19,7 +19,7 @@ import { projectShowcaseInstance } from './projectShowcase.js';
 class App {
   constructor() {
     this.canvas = document.getElementById('webgl-canvas');
-    this.clock = new THREE.Clock();
+    this.timer = new THREE.Timer();
     this.currentWaypointIndex = 0;
     this._bootTime = Date.now();
     this._animateBound = this.animate.bind(this);
@@ -64,10 +64,10 @@ class App {
     };
     window.addEventListener('resize', this._onResize, { passive: true });
     document.addEventListener('visibilitychange', () => {
-      // Pause GPU work when tab hidden; clock delta clamped on resume
+      // Pause GPU work when tab hidden; timer reset discards the hidden gap on resume
       this._isVisible = !document.hidden;
       if (this._isVisible) {
-        this.clock.getDelta();
+        this.timer.reset();
         if (!this._rafRunning) this.animate();
       }
     });
@@ -1282,10 +1282,11 @@ class App {
     this._rafRunning = true;
     requestAnimationFrame(this._animateBound);
 
-    // getDelta() updates elapsedTime internally; reading .elapsedTime avoids a
-    // second internal getDelta call that would return ~0 (old getElapsedTime bug)
-    const delta = Math.min(this.clock.getDelta(), 0.05);
-    const elapsedTime = this.clock.elapsedTime;
+    // Timer requires an explicit update() per frame; getDelta()/getElapsed()
+    // then return stable values for this simulation step (clamped for tab-switch gaps)
+    this.timer.update();
+    const delta = Math.min(this.timer.getDelta(), 0.05);
+    const elapsedTime = this.timer.getElapsed();
 
     if (this.cabin && this.cabin.update) this.cabin.update(elapsedTime);
     if (this.campfire && this.campfire.update) this.campfire.update(elapsedTime);

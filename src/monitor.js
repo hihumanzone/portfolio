@@ -458,15 +458,15 @@ class RetroWorkspaceApp {
     // 2. CSS3D Scene & Renderer
     this.cssScene = new THREE.Scene();
 
-    // 3. Camera (viewed from a subtle bottom-left angle, zoomed in)
+    // 3. Camera (framed for adaptive monitor filling screen)
     this.camera = new THREE.PerspectiveCamera(
-      32.5,
+      31.8,
       window.innerWidth / window.innerHeight,
       1,
       8000
     );
-    this.camera.position.set(-115, 390, 1680);
-    this.cameraTarget = new THREE.Vector3(-15, 460, 0);
+    this.camera.position.set(-35, 365, 1600);
+    this.cameraTarget = new THREE.Vector3(0, 415, 0);
     this.camera.lookAt(this.cameraTarget);
 
     // 4. WebGL Renderer
@@ -501,8 +501,8 @@ class RetroWorkspaceApp {
     this.keyLight.shadow.mapSize.height = 2048;
     this.keyLight.shadow.camera.near = 200;
     this.keyLight.shadow.camera.far = 3200;
-    this.keyLight.shadow.camera.left = -1100;
-    this.keyLight.shadow.camera.right = 1100;
+    this.keyLight.shadow.camera.left = -1500;
+    this.keyLight.shadow.camera.right = 1500;
     this.keyLight.shadow.camera.top = 1300;
     this.keyLight.shadow.camera.bottom = -900;
     this.keyLight.shadow.bias = -0.0004;
@@ -565,7 +565,7 @@ class RetroWorkspaceApp {
     ];
 
     // 1. Single Solid Seamless Tabletop Slab (Top surface at y = -95, front edge at z = 650)
-    const slabGeo = new THREE.BoxGeometry(2800, 56, 1700);
+    const slabGeo = new THREE.BoxGeometry(4400, 56, 1700);
     const slabMesh = new THREE.Mesh(slabGeo, slabMaterials);
     slabMesh.position.set(0, -123, -200);
     slabMesh.receiveShadow = true;
@@ -581,10 +581,10 @@ class RetroWorkspaceApp {
     });
 
     const legPositions = [
-      [-1200, -450, 500],
-      [1200, -450, 500],
-      [-1200, -450, -900],
-      [1200, -450, -900]
+      [-1600, -450, 500],
+      [1600, -450, 500],
+      [-1600, -450, -900],
+      [1600, -450, -900]
     ];
     // Legs + feet as single-draw instanced meshes (identical transforms/shadows)
     const _legDummy = new THREE.Object3D();
@@ -608,7 +608,7 @@ class RetroWorkspaceApp {
     this.tableGroup.add(instancedLegs, instancedFeet);
 
     // 3. Table Support Apron/Skirt
-    const apronGeo = new THREE.BoxGeometry(2450, 75, 24);
+    const apronGeo = new THREE.BoxGeometry(4000, 75, 24);
     const apronFront = new THREE.Mesh(apronGeo, edgeMat);
     apronFront.position.set(0, -188, 520);
     apronFront.receiveShadow = true;
@@ -655,176 +655,279 @@ class RetroWorkspaceApp {
       metalness: 0.05
     });
 
-    // -------------------------------------------------------------------------
-    // 1. Main Tapered CRT Housing Body
-    // -------------------------------------------------------------------------
-    // Top Cowl / Hood
-    const topPanelGeo = new THREE.BoxGeometry(1180, 40, 680);
-    const topPanel = new THREE.Mesh(topPanelGeo, this.chassisMat);
-    topPanel.position.set(0, 940, -320);
-    topPanel.castShadow = true;
-    topPanel.receiveShadow = true;
-    this.monitorGroup.add(topPanel);
+    // Pedestal Swivel Stand (Rests firmly on Tabletop at y = -95)
+    this.pedestalGroup = new THREE.Group();
 
-    // Bottom Base Panel of Cabinet
-    const bottomPanelGeo = new THREE.BoxGeometry(1160, 40, 640);
-    const bottomPanel = new THREE.Mesh(bottomPanelGeo, this.chassisMat);
-    bottomPanel.position.set(0, 60, -300);
-    bottomPanel.castShadow = true;
-    bottomPanel.receiveShadow = true;
-    this.monitorGroup.add(bottomPanel);
+    // Swivel Neck
+    const neckGeo = new THREE.BoxGeometry(220, 70, 180);
+    const neckMat = new THREE.MeshStandardMaterial({
+      color: 0xb5ab9a,
+      roughness: 0.55,
+      metalness: 0.05
+    });
+    const neckMesh = new THREE.Mesh(neckGeo, neckMat);
+    neckMesh.position.set(0, -35, -180);
+    neckMesh.castShadow = true;
+    neckMesh.receiveShadow = true;
+    this.pedestalGroup.add(neckMesh);
 
-    // Left Side Cheek
-    const leftCheekGeo = new THREE.BoxGeometry(40, 880, 660);
-    const leftCheek = new THREE.Mesh(leftCheekGeo, this.chassisMat);
-    leftCheek.position.set(-570, 500, -310);
-    leftCheek.castShadow = true;
-    leftCheek.receiveShadow = true;
-    this.monitorGroup.add(leftCheek);
+    // Broad Beveled Pedestal Foot (bottom touches table at y = -95)
+    const footGeo = new THREE.BoxGeometry(520, 25, 380);
+    const footMat = new THREE.MeshStandardMaterial({
+      color: 0xc8bfae,
+      roughness: 0.52,
+      metalness: 0.05
+    });
+    const footMesh = new THREE.Mesh(footGeo, footMat);
+    footMesh.position.set(0, -82.5, -170);
+    footMesh.castShadow = true;
+    footMesh.receiveShadow = true;
+    this.pedestalGroup.add(footMesh);
 
-    // Right Side Cheek
-    const rightCheekGeo = new THREE.BoxGeometry(40, 880, 660);
-    const rightCheek = new THREE.Mesh(rightCheekGeo, this.chassisMat);
-    rightCheek.position.set(570, 500, -310);
-    rightCheek.castShadow = true;
-    rightCheek.receiveShadow = true;
-    this.monitorGroup.add(rightCheek);
+    this.monitorGroup.add(this.pedestalGroup);
 
-    // Tapered Rear Enclosure
-    const rearCapGeo = new THREE.BoxGeometry(780, 640, 60);
-    const rearCap = new THREE.Mesh(rearCapGeo, this.chassisMat);
-    rearCap.position.set(0, 500, -660);
-    rearCap.castShadow = true;
-    this.monitorGroup.add(rearCap);
-
-    // -------------------------------------------------------------------------
-    // 2. Front Bezel Frame (Frames the 1024x768 screen cavity at z = 0)
-    // -------------------------------------------------------------------------
-    // Top Front Bezel
-    const fTopGeo = new THREE.BoxGeometry(1180, 76, 50);
-    const fTop = new THREE.Mesh(fTopGeo, this.chassisMat);
-    fTop.position.set(0, 922, 12);
-    fTop.castShadow = true;
-    fTop.receiveShadow = true;
-    this.monitorGroup.add(fTop);
-
-    // Left Front Bezel
-    const fLeftGeo = new THREE.BoxGeometry(78, 768, 50);
-    const fLeft = new THREE.Mesh(fLeftGeo, this.chassisMat);
-    fLeft.position.set(-551, 500, 12);
-    fLeft.castShadow = true;
-    fLeft.receiveShadow = true;
-    this.monitorGroup.add(fLeft);
-
-    // Right Front Bezel
-    const fRightGeo = new THREE.BoxGeometry(78, 768, 50);
-    const fRight = new THREE.Mesh(fRightGeo, this.chassisMat);
-    fRight.position.set(551, 500, 12);
-    fRight.castShadow = true;
-    fRight.receiveShadow = true;
-    this.monitorGroup.add(fRight);
-
-    // Bottom Chin Bezel (Houses Badge, Dials, LED)
-    const fBottomGeo = new THREE.BoxGeometry(1180, 116, 50);
-    const fBottom = new THREE.Mesh(fBottomGeo, this.chassisMat);
-    fBottom.position.set(0, 58, 12);
-    fBottom.castShadow = true;
-    fBottom.receiveShadow = true;
-    this.monitorGroup.add(fBottom);
-
-    // Recessed Rubber CRT Tube Gasket (Inner frame around screen)
-    const gasketTop = new THREE.Mesh(new THREE.BoxGeometry(1030, 8, 16), this.darkBezelMat);
-    gasketTop.position.set(0, 886, 6);
-    this.monitorGroup.add(gasketTop);
-
-    const gasketBottom = new THREE.Mesh(new THREE.BoxGeometry(1030, 8, 16), this.darkBezelMat);
-    gasketBottom.position.set(0, 114, 6);
-    this.monitorGroup.add(gasketBottom);
-
-    const gasketLeft = new THREE.Mesh(new THREE.BoxGeometry(8, 768, 16), this.darkBezelMat);
-    gasketLeft.position.set(-514, 500, 6);
-    this.monitorGroup.add(gasketLeft);
-
-    const gasketRight = new THREE.Mesh(new THREE.BoxGeometry(8, 768, 16), this.darkBezelMat);
-    gasketRight.position.set(514, 500, 6);
-    this.monitorGroup.add(gasketRight);
-
-    // -------------------------------------------------------------------------
-    // 3. Top Ventilation Louvers / Cooling Grille
-    // -------------------------------------------------------------------------
-    const ventGroup = new THREE.Group();
-    const ventSlotGeo = new THREE.BoxGeometry(38, 5, 8);
-    const ventMat = new THREE.MeshStandardMaterial({ color: 0x3a342a, roughness: 0.8 });
-    // 13 slots, one draw call (identical placement, no per-slot meshes)
-    const instancedVents = new THREE.InstancedMesh(ventSlotGeo, ventMat, 13);
-    {
-      const dummy = new THREE.Object3D();
-      for (let i = -6; i <= 6; i++) {
-        dummy.position.set(i * 50, 962, -20);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(1, 1, 1);
-        dummy.updateMatrix();
-        instancedVents.setMatrixAt(i + 6, dummy.matrix);
-      }
-    }
-    instancedVents.instanceMatrix.needsUpdate = true;
-    ventGroup.add(instancedVents);
-    this.monitorGroup.add(ventGroup);
-
-    // -------------------------------------------------------------------------
-    // 4. Bottom Chin Details: Nameplate Badge, Dials, LED
-    // -------------------------------------------------------------------------
-    // Nameplate Badge Push-Button: "RIDDHIMAN KUNDAL PORTFOLIO"
-    // Recessed socket housing so the button reads as a real 3D push-button
-    const socketGeo = new THREE.BoxGeometry(336, 60, 8);
-    const socketMesh = new THREE.Mesh(socketGeo, this.darkBezelMat);
-    socketMesh.position.set(-330, 58, 34);
-    socketMesh.receiveShadow = true;
-    this.monitorGroup.add(socketMesh);
-
-    const badgeTexture = createBadgeTexture();
-    const badgeGeo = new THREE.BoxGeometry(320, 46, 16);
-    const badgeMat = new THREE.MeshStandardMaterial({
-      map: badgeTexture,
+    // Textures and shared materials for buttons
+    this.badgeTexture = createBadgeTexture();
+    this.badgeMat = new THREE.MeshStandardMaterial({
+      map: this.badgeTexture,
       roughness: 0.35,
       metalness: 0.15
     });
-    // Dark plastic sides so only the front face shows the label texture
-    const badgeSideMat = new THREE.MeshStandardMaterial({
+    this.badgeSideMat = new THREE.MeshStandardMaterial({
       color: 0x0d0f14,
       roughness: 0.5,
       metalness: 0.2
     });
-    const badgeMesh = new THREE.Mesh(badgeGeo, [
-      badgeSideMat, // +X
-      badgeSideMat, // -X
-      badgeSideMat, // +Y
-      badgeSideMat, // -Y
-      badgeMat,     // +Z front face
-      badgeSideMat  // -Z
-    ]);
-    // Rest position pops out of the chin; pressed position sits near-flush
-    this.badgeRestZ = 46;
-    this.badgePressedZ = 38;
+
+    this.fsExpandTex = createFullscreenIconTexture(FS_EXPAND_PATH);
+    this.fsCompressTex = createFullscreenIconTexture(FS_COMPRESS_PATH);
+    this.fsIconMat = new THREE.MeshStandardMaterial({
+      map: this.fsExpandTex,
+      roughness: 0.4,
+      metalness: 0.1
+    });
+
+    this.badgeRestZ = 42;
+    this.badgePressedZ = 34;
     this.badgeTargetZ = this.badgeRestZ;
-    badgeMesh.position.set(-330, 58, this.badgeRestZ);
+    this.fsRestZ = 42;
+    this.fsPressedZ = 34;
+    this.fsTargetZ = this.fsRestZ;
+
+    // Group holding the adaptive monitor chassis & chin controls
+    this.chassisGroup = new THREE.Group();
+    this.monitorGroup.add(this.chassisGroup);
+
+    // Initial default screen dimensions
+    this.currentScreenWidth = 1024;
+    this.currentScreenHeight = 768;
+
+    this.buildMonitorChassis(this.currentScreenWidth, this.currentScreenHeight);
+
+    this.scene.add(this.monitorGroup);
+  }
+
+  /**
+   * Parametrically builds the slim-bezel auto-adaptive CRT monitor chassis & chin controls
+   */
+  buildMonitorChassis(screenWidth, screenHeight) {
+    // Clean up previous children and dispose geometries
+    while (this.chassisGroup.children.length > 0) {
+      const child = this.chassisGroup.children[0];
+      if (child.geometry) child.geometry.dispose();
+      this.chassisGroup.remove(child);
+    }
+
+    const Ws = screenWidth;
+    const Hs = screenHeight; // Reference 768
+    const sideBezel = 20;    // Slim side bezel (reduced from 78)
+    const cheekWidth = 14;   // Slim cheek (reduced from 40)
+    const topBezel = 20;     // Slim top bezel (reduced from 76)
+    const hoodHeight = 14;   // Slim top cowl (reduced from 40)
+    const chinHeight = 66;   // Compact chin (reduced from 116)
+    const Wchassis = Ws + (sideBezel + cheekWidth) * 2; // Ws + 68
+
+    // Screen cavity bounds:
+    // Screen spans x in [-Ws/2, +Ws/2], y in [66, 66 + Hs = 834] (center y = 450)
+    const screenCenterY = 450;
+    const screenTopY = screenCenterY + Hs / 2;    // 834
+    const screenBottomY = screenCenterY - Hs / 2; // 66
+    const chinCenterY = screenBottomY - chinHeight / 2; // 33
+
+    // -------------------------------------------------------------------------
+    // 1. Slim Housing Body (Cowl, Base, Cheeks, Rear)
+    // -------------------------------------------------------------------------
+    // Top Cowl / Hood
+    const topPanel = new THREE.Mesh(new THREE.BoxGeometry(Wchassis, hoodHeight, 520), this.chassisMat);
+    topPanel.position.set(0, screenTopY + topBezel + hoodHeight / 2, -240);
+    topPanel.castShadow = true;
+    topPanel.receiveShadow = true;
+    this.chassisGroup.add(topPanel);
+
+    // Bottom Base Panel of Cabinet (full chassis width so bottom corners sit flush)
+    const bottomPanel = new THREE.Mesh(new THREE.BoxGeometry(Wchassis, 16, 500), this.chassisMat);
+    bottomPanel.position.set(0, -8, -230);
+    bottomPanel.castShadow = true;
+    bottomPanel.receiveShadow = true;
+    this.chassisGroup.add(bottomPanel);
+
+    // Left Side Cheek (Flush with top hood y=868 and bottom base y=-16)
+    const totalCheekHeight = Hs + topBezel + hoodHeight + chinHeight + 16; // 884
+    const cheekCenterY = (screenTopY + topBezel + hoodHeight - 16) / 2;    // 426
+    const leftCheek = new THREE.Mesh(new THREE.BoxGeometry(cheekWidth, totalCheekHeight, 520), this.chassisMat);
+    leftCheek.position.set(-Wchassis / 2 + cheekWidth / 2, cheekCenterY, -240);
+    leftCheek.castShadow = true;
+    leftCheek.receiveShadow = true;
+    this.chassisGroup.add(leftCheek);
+
+    // Right Side Cheek
+    const rightCheek = new THREE.Mesh(new THREE.BoxGeometry(cheekWidth, totalCheekHeight, 520), this.chassisMat);
+    rightCheek.position.set(Wchassis / 2 - cheekWidth / 2, cheekCenterY, -240);
+    rightCheek.castShadow = true;
+    rightCheek.receiveShadow = true;
+    this.chassisGroup.add(rightCheek);
+
+    // Tapered Rear Enclosure
+    const rearCap = new THREE.Mesh(new THREE.BoxGeometry(Wchassis * 0.72, totalCheekHeight * 0.75, 50), this.chassisMat);
+    rearCap.position.set(0, cheekCenterY, -490);
+    rearCap.castShadow = true;
+    this.chassisGroup.add(rearCap);
+
+    // -------------------------------------------------------------------------
+    // 2. Slim Front Bezel Frame (Frames the Ws x Hs screen cavity at z = 12)
+    // -------------------------------------------------------------------------
+    // Top/Bottom bezels span only the inner width BETWEEN the side bezels
+    // so overlapping boxes can't poke past each other at the corners
+    const innerBezelWidth = Ws + sideBezel * 2;
+    // Top Front Bezel
+    const fTop = new THREE.Mesh(new THREE.BoxGeometry(innerBezelWidth, topBezel, 40), this.chassisMat);
+    fTop.position.set(0, screenTopY + topBezel / 2, 12);
+    fTop.castShadow = true;
+    fTop.receiveShadow = true;
+    this.chassisGroup.add(fTop);
+
+    // Left/Right Front Bezels run full cavity height INCLUDING the top and
+    // bottom bezel bands, so the frame corners meet flush with no step/notch
+    const fullBezelHeight = Hs + topBezel + chinHeight;
+    const fullBezelCenterY = screenCenterY + (topBezel - chinHeight) / 2;
+    // Left Front Bezel
+    const fLeft = new THREE.Mesh(new THREE.BoxGeometry(sideBezel, fullBezelHeight, 40), this.chassisMat);
+    fLeft.position.set(-Ws / 2 - sideBezel / 2, fullBezelCenterY, 12);
+    fLeft.castShadow = true;
+    fLeft.receiveShadow = true;
+    this.chassisGroup.add(fLeft);
+
+    // Right Front Bezel
+    const fRight = new THREE.Mesh(new THREE.BoxGeometry(sideBezel, fullBezelHeight, 40), this.chassisMat);
+    fRight.position.set(Ws / 2 + sideBezel / 2, fullBezelCenterY, 12);
+    fRight.castShadow = true;
+    fRight.receiveShadow = true;
+    this.chassisGroup.add(fRight);
+
+    // Bottom Chin Bezel (Houses Badge, Fullscreen button, Dials, LED)
+    const fBottom = new THREE.Mesh(new THREE.BoxGeometry(innerBezelWidth, chinHeight, 40), this.chassisMat);
+    fBottom.position.set(0, chinCenterY, 12);
+    fBottom.castShadow = true;
+    fBottom.receiveShadow = true;
+    this.chassisGroup.add(fBottom);
+
+    // Recessed Rubber CRT Tube Gasket (Inner slim 4px frame around screen)
+    const gasketTop = new THREE.Mesh(new THREE.BoxGeometry(Ws + 4, 4, 16), this.darkBezelMat);
+    gasketTop.position.set(0, screenTopY + 2, 6);
+    this.chassisGroup.add(gasketTop);
+
+    const gasketBottom = new THREE.Mesh(new THREE.BoxGeometry(Ws + 4, 4, 16), this.darkBezelMat);
+    gasketBottom.position.set(0, screenBottomY - 2, 6);
+    this.chassisGroup.add(gasketBottom);
+
+    const gasketLeft = new THREE.Mesh(new THREE.BoxGeometry(4, Hs, 16), this.darkBezelMat);
+    gasketLeft.position.set(-Ws / 2 - 2, screenCenterY, 6);
+    this.chassisGroup.add(gasketLeft);
+
+    const gasketRight = new THREE.Mesh(new THREE.BoxGeometry(4, Hs, 16), this.darkBezelMat);
+    gasketRight.position.set(Ws / 2 + 2, screenCenterY, 6);
+    this.chassisGroup.add(gasketRight);
+
+    // -------------------------------------------------------------------------
+    // 3. Top Ventilation Louvers / Cooling Grille
+    // -------------------------------------------------------------------------
+    const ventSlotGeo = new THREE.BoxGeometry(32, 4, 8);
+    const ventMat = new THREE.MeshStandardMaterial({ color: 0x3a342a, roughness: 0.8 });
+    const ventCount = 15;
+    const instancedVents = new THREE.InstancedMesh(ventSlotGeo, ventMat, ventCount);
+    {
+      const dummy = new THREE.Object3D();
+      const halfVents = Math.floor(ventCount / 2);
+      for (let i = -halfVents; i <= halfVents; i++) {
+        dummy.position.set(i * 44, screenTopY + topBezel + hoodHeight + 2, -20);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        instancedVents.setMatrixAt(i + halfVents, dummy.matrix);
+      }
+    }
+    instancedVents.instanceMatrix.needsUpdate = true;
+    this.chassisGroup.add(instancedVents);
+
+    // -------------------------------------------------------------------------
+    // 4. Bottom Chin Controls: Badge, Fullscreen, Knobs, Switch, LED
+    // -------------------------------------------------------------------------
+    // Position badge and fullscreen on left portion of chin
+    const badgeX = Math.min(-280, -Ws * 0.25);
+    const fsX = badgeX + 178;
+
+    // "RIDDHIMAN KUNDAL PORTFOLIO" Badge Push-Button
+    const socketGeo = new THREE.BoxGeometry(300, 42, 8);
+    const socketMesh = new THREE.Mesh(socketGeo, this.darkBezelMat);
+    socketMesh.position.set(badgeX, chinCenterY, 32);
+    socketMesh.receiveShadow = true;
+    this.chassisGroup.add(socketMesh);
+
+    const badgeGeo = new THREE.BoxGeometry(286, 34, 16);
+    const badgeMesh = new THREE.Mesh(badgeGeo, [
+      this.badgeSideMat, // +X
+      this.badgeSideMat, // -X
+      this.badgeSideMat, // +Y
+      this.badgeSideMat, // -Y
+      this.badgeMat,     // +Z front face
+      this.badgeSideMat  // -Z
+    ]);
+    badgeMesh.position.set(badgeX, chinCenterY, this.badgeRestZ);
     badgeMesh.castShadow = true;
     badgeMesh.userData.isPortfolioBadge = true;
     badgeMesh.userData.portfolioUrl = 'portfolio.html';
-    this.monitorGroup.add(badgeMesh);
+    this.chassisGroup.add(badgeMesh);
     this.badgeMesh = badgeMesh;
-    this.badgeMat = badgeMat;
 
-    // Click target is the badge mesh itself (same size as the button)
-    this.badgeHitbox = null;
+    // Fullscreen Push-Button
+    const fsSocketGeo = new THREE.BoxGeometry(46, 44, 8);
+    const fsSocketMesh = new THREE.Mesh(fsSocketGeo, this.darkBezelMat);
+    fsSocketMesh.position.set(fsX, chinCenterY, 32);
+    fsSocketMesh.receiveShadow = true;
+    this.chassisGroup.add(fsSocketMesh);
 
-    // Decorative Center Mini-Vents (one shared geo, one draw call)
-    const miniVentGeo = new THREE.BoxGeometry(4, 22, 4);
+    const fsFaceGeo = new THREE.BoxGeometry(34, 34, 16);
+    const fsButtonMesh = new THREE.Mesh(fsFaceGeo, [
+      this.darkBezelMat, // +X
+      this.darkBezelMat, // -X
+      this.darkBezelMat, // +Y
+      this.darkBezelMat, // -Y
+      this.fsIconMat,    // +Z front face
+      this.darkBezelMat  // -Z
+    ]);
+    fsButtonMesh.position.set(fsX, chinCenterY, this.fsRestZ);
+    fsButtonMesh.castShadow = true;
+    fsButtonMesh.userData.isFullscreenButton = true;
+    this.chassisGroup.add(fsButtonMesh);
+    this.fsButtonMesh = fsButtonMesh;
+
+    // Decorative Center Mini-Vents
+    const miniVentGeo = new THREE.BoxGeometry(4, 20, 4);
     const instancedMiniVents = new THREE.InstancedMesh(miniVentGeo, ventMat, 5);
     {
       const dummy = new THREE.Object3D();
       for (let i = -2; i <= 2; i++) {
-        dummy.position.set(i * 9, 58, 36);
+        dummy.position.set(i * 8, chinCenterY, 34);
         dummy.rotation.set(0, 0, 0);
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
@@ -832,10 +935,11 @@ class RetroWorkspaceApp {
       }
     }
     instancedMiniVents.instanceMatrix.needsUpdate = true;
-    this.monitorGroup.add(instancedMiniVents);
+    this.chassisGroup.add(instancedMiniVents);
 
-    // Rotary Knobs: Brightness & Contrast
-    const knobGeo = new THREE.CylinderGeometry(13, 13, 12, 24);
+    // Right Controls Cluster (Knobs, Degauss, Power Switch, Glowing Emerald LED)
+    const rightStartX = Math.max(220, Ws * 0.20);
+    const knobGeo = new THREE.CylinderGeometry(11, 11, 10, 20);
     const knobMat = new THREE.MeshStandardMaterial({
       color: 0xb5ab9a,
       roughness: 0.45,
@@ -845,30 +949,30 @@ class RetroWorkspaceApp {
     // Brightness Knob
     const brightKnob = new THREE.Mesh(knobGeo, knobMat);
     brightKnob.rotation.x = Math.PI / 2;
-    brightKnob.position.set(240, 58, 40);
-    this.monitorGroup.add(brightKnob);
+    brightKnob.position.set(rightStartX, chinCenterY, 38);
+    this.chassisGroup.add(brightKnob);
 
     // Contrast Knob
     const contrastKnob = new THREE.Mesh(knobGeo, knobMat);
     contrastKnob.rotation.x = Math.PI / 2;
-    contrastKnob.position.set(310, 58, 40);
-    this.monitorGroup.add(contrastKnob);
+    contrastKnob.position.set(rightStartX + 60, chinCenterY, 38);
+    this.chassisGroup.add(contrastKnob);
 
     // Degauss Push Button
-    const degaussGeo = new THREE.CylinderGeometry(9, 9, 8, 20);
+    const degaussGeo = new THREE.CylinderGeometry(8, 8, 7, 16);
     const degaussMat = new THREE.MeshStandardMaterial({ color: 0x9c9282, roughness: 0.5 });
     const degaussBtn = new THREE.Mesh(degaussGeo, degaussMat);
     degaussBtn.rotation.x = Math.PI / 2;
-    degaussBtn.position.set(380, 58, 38);
-    this.monitorGroup.add(degaussBtn);
+    degaussBtn.position.set(rightStartX + 120, chinCenterY, 36);
+    this.chassisGroup.add(degaussBtn);
 
     // Power Rocker Switch
-    const switchBase = new THREE.Mesh(new THREE.BoxGeometry(26, 20, 10), this.darkBezelMat);
-    switchBase.position.set(445, 58, 38);
-    this.monitorGroup.add(switchBase);
+    const switchBase = new THREE.Mesh(new THREE.BoxGeometry(22, 18, 9), this.darkBezelMat);
+    switchBase.position.set(rightStartX + 175, chinCenterY, 36);
+    this.chassisGroup.add(switchBase);
 
     // Glowing Power LED (Phosphor Emerald Green)
-    const ledGeo = new THREE.SphereGeometry(5.5, 16, 16);
+    const ledGeo = new THREE.SphereGeometry(4.5, 16, 16);
     const ledMat = new THREE.MeshStandardMaterial({
       color: 0x66ff99,
       emissive: 0x38ef7d,
@@ -876,86 +980,29 @@ class RetroWorkspaceApp {
       roughness: 0.2
     });
     const ledMesh = new THREE.Mesh(ledGeo, ledMat);
-    ledMesh.position.set(505, 58, 39);
-    this.monitorGroup.add(ledMesh);
+    ledMesh.position.set(rightStartX + 225, chinCenterY, 37);
+    this.chassisGroup.add(ledMesh);
 
     // LED Glow Light (soft real-time bounce onto bezel)
     const ledLight = new THREE.PointLight(0x38ef7d, 1.2, 140);
-    ledLight.position.set(505, 58, 48);
-    this.monitorGroup.add(ledLight);
+    ledLight.position.set(rightStartX + 225, chinCenterY, 46);
+    this.chassisGroup.add(ledLight);
 
-    // Fullscreen Push-Button: badge-style 3D control on the chin, in the open
-    // bay between the portfolio badge (right edge -162) and the mini-vents.
-    // Recessed socket housing + 8-unit travel mirror the RIDDHIMAN PORTFOLIO
-    // button so the inward press reads clearly. Icon face swaps between
-    // expand/compress glyphs with fullscreen state.
-    const fsSocketGeo = new THREE.BoxGeometry(54, 54, 8);
-    const fsSocketMesh = new THREE.Mesh(fsSocketGeo, this.darkBezelMat);
-    fsSocketMesh.position.set(-110, 58, 34);
-    fsSocketMesh.receiveShadow = true;
-    this.monitorGroup.add(fsSocketMesh);
+    // Reset cached targets so raycasting uses new button meshes
+    this._badgeTargets = null;
+    this._fsTargets = null;
 
-    this.fsExpandTex = createFullscreenIconTexture(FS_EXPAND_PATH);
-    this.fsCompressTex = createFullscreenIconTexture(FS_COMPRESS_PATH);
-    const fsFaceGeo = new THREE.BoxGeometry(40, 40, 16);
-    this.fsIconMat = new THREE.MeshStandardMaterial({
-      map: this.fsExpandTex,
-      roughness: 0.4,
-      metalness: 0.1
-    });
-    const fsButtonMesh = new THREE.Mesh(fsFaceGeo, [
-      this.darkBezelMat, // +X
-      this.darkBezelMat, // -X
-      this.darkBezelMat, // +Y
-      this.darkBezelMat, // -Y
-      this.fsIconMat,    // +Z front face
-      this.darkBezelMat  // -Z
-    ]);
-    // Rest position pops out of the socket; pressed position sits near-flush
-    // (same 8-unit travel as the portfolio badge)
-    this.fsRestZ = 46;
-    this.fsPressedZ = 38;
-    this.fsTargetZ = this.fsRestZ;
-    fsButtonMesh.position.set(-110, 58, this.fsRestZ);
-    fsButtonMesh.castShadow = true;
-    fsButtonMesh.userData.isFullscreenButton = true;
-    this.monitorGroup.add(fsButtonMesh);
-    this.fsButtonMesh = fsButtonMesh;
-
-    // -------------------------------------------------------------------------
-    // 5. Pedestal Swivel Stand (Rests firmly on Tabletop at y = -95)
-    // -------------------------------------------------------------------------
-    const pedestalGroup = new THREE.Group();
-
-    // Swivel Neck
-    const neckGeo = new THREE.BoxGeometry(220, 100, 180);
-    const neckMat = new THREE.MeshStandardMaterial({
-      color: 0xb5ab9a,
-      roughness: 0.55,
-      metalness: 0.05
-    });
-    const neckMesh = new THREE.Mesh(neckGeo, neckMat);
-    neckMesh.position.set(0, -12, -220);
-    neckMesh.castShadow = true;
-    neckMesh.receiveShadow = true;
-    pedestalGroup.add(neckMesh);
-
-    // Broad Beveled Pedestal Foot (bottom touches table at y = -95)
-    const footGeo = new THREE.BoxGeometry(540, 32, 420);
-    const footMat = new THREE.MeshStandardMaterial({
-      color: 0xc8bfae,
-      roughness: 0.52,
-      metalness: 0.05
-    });
-    const footMesh = new THREE.Mesh(footGeo, footMat);
-    footMesh.position.set(0, -79, -200);
-    footMesh.castShadow = true;
-    footMesh.receiveShadow = true;
-    pedestalGroup.add(footMesh);
-
-    this.monitorGroup.add(pedestalGroup);
-
-    this.scene.add(this.monitorGroup);
+    // Update CSS3D viewport element dimensions & position if created
+    if (this.screenEl) {
+      this.screenEl.style.width = `${Ws}px`;
+      this.screenEl.style.height = `${Hs}px`;
+    }
+    if (this.screenObject) {
+      const screenLocalPos = new THREE.Vector3(0, screenCenterY, 14);
+      screenLocalPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.monitorGroup.rotation.x);
+      this.screenObject.position.copy(screenLocalPos);
+      this.screenObject.rotation.x = this.monitorGroup.rotation.x;
+    }
   }
 
   /**
@@ -967,7 +1014,10 @@ class RetroWorkspaceApp {
       if (!group) continue;
       group.traverse((obj) => {
         // Both push-buttons animate, so their matrices stay live
-        if (obj === this.badgeMesh || obj === this.fsButtonMesh) return;
+        if (obj === this.badgeMesh || obj === this.fsButtonMesh) {
+          obj.matrixAutoUpdate = true;
+          return;
+        }
         obj.updateMatrix();
         obj.matrixAutoUpdate = false;
       });
@@ -977,12 +1027,15 @@ class RetroWorkspaceApp {
   }
 
   /**
-   * Embeds the 1024x768 website iframe inside the 3D Monitor Screen via CSS3DObject
+   * Embeds the website iframe inside the 3D Monitor Screen via CSS3DObject
    */
   createCSS3DScreen() {
     // 1. Create Screen Container DOM Element
     const screenEl = document.createElement('div');
     screenEl.className = 'screen-3d-viewport';
+    screenEl.style.width = `${this.currentScreenWidth}px`;
+    screenEl.style.height = `${this.currentScreenHeight}px`;
+    this.screenEl = screenEl;
 
     // 2. Iframe loading portfolio.html (embedded mode)
     const iframe = document.createElement('iframe');
@@ -1008,10 +1061,9 @@ class RetroWorkspaceApp {
 
     // 4. Wrap in CSS3DObject
     this.screenObject = new CSS3DObject(screenEl);
-    // 1:1 scale for exact 1024x768 3D bezel dimensions
     this.screenObject.scale.set(1, 1, 1);
     // Align screen with monitor tilt and position in 3D space
-    const screenLocalPos = new THREE.Vector3(0, 500, 14);
+    const screenLocalPos = new THREE.Vector3(0, 450, 14);
     screenLocalPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.monitorGroup.rotation.x);
     this.screenObject.position.copy(screenLocalPos);
     this.screenObject.rotation.x = this.monitorGroup.rotation.x;
@@ -1321,34 +1373,47 @@ class RetroWorkspaceApp {
 
     this.camera.aspect = aspect;
 
-    // Target framing aspect for 3D monitor + desk: ~1.25 (1500 / 1200)
-    const targetAspect = 1500 / 1200;
-    const baseFov = 32.5;
+    // Visual assembly height in 3D units:
+    // Screen (768) + Top borders (34) + Bottom chin/base (82) + Stand peeking visible (34) = 918
+    const assemblyHeight = 918;
+    const horizontalBorders = 68; // Left (20+14) + Right (20+14)
 
-    if (aspect < targetAspect) {
-      // Narrow screens (mobile portrait / square): widen vertical FOV so full monitor & table remain in view
-      const fovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (targetAspect / aspect));
+    // Compute target screen width so monitor chassis fills the viewer's screen width and aspect ratio
+    const targetScreenWidth = Math.round(
+      THREE.MathUtils.clamp(aspect * assemblyHeight - horizontalBorders, 1024, 2200)
+    );
+
+    if (Math.abs(targetScreenWidth - this.currentScreenWidth) >= 4) {
+      this.currentScreenWidth = targetScreenWidth;
+      this.buildMonitorChassis(this.currentScreenWidth, this.currentScreenHeight);
+      this.freezeStaticMatrices();
+    }
+
+    // Actual aspect ratio of the monitor assembly
+    const monAspect = (this.currentScreenWidth + horizontalBorders) / assemblyHeight;
+    const baseFov = 31.8;
+
+    if (aspect < monAspect) {
+      // Narrow screens: expand vertical FOV so full monitor and table remain in view
+      const fovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (monAspect / aspect));
       this.camera.fov = (fovRad * 180) / Math.PI;
-      this.camera.position.set(-115, 390, 1680);
     } else {
-      // Wide screens (desktop & laptop landscape): adaptive camera distance for smaller laptop screens
-      // On compact laptop screens (height <= 850px), smoothly adjust camera closer so the monitor is larger
-      // and much more readable, while keeping the wooden desk and bezel buttons in clear, comfortable view.
-      const heightProgress = THREE.MathUtils.clamp((height - 580) / 340, 0, 1);
-      const camZ = THREE.MathUtils.lerp(1550, 1680, heightProgress);
-      const camY = THREE.MathUtils.lerp(410, 390, heightProgress);
-      const camX = THREE.MathUtils.lerp(-95, -115, heightProgress);
-
-      this.camera.position.set(camX, camY, camZ);
       this.camera.fov = baseFov;
     }
+
+    // Camera framing: monitor fills width and height, top cowl near top edge,
+    // bottom chin controls visible with exact stand sliver aesthetic above walnut table
+    const camZ = 1600;
+    const camY = 365;
+    const camX = -35;
+    this.camera.position.set(camX, camY, camZ);
+    this.cameraTarget.set(0, 415, 0);
 
     this.camera.updateProjectionMatrix();
     this.camera.lookAt(this.cameraTarget);
 
     this.renderer.setSize(width, height);
     this.cssRenderer.setSize(width, height);
-    // Resized buffers need a fresh frame (shadow map included)
     this._sceneDirty = true;
 
     // Portrait Orientation Notice

@@ -215,7 +215,7 @@ export class ProjectShowcase {
     // Animation loop
     this.animFrameId = null;
     this.isRunning = false;
-    this.clock = new THREE.Clock();
+    this.timer = new THREE.Timer();
 
     // DOM references
     this.initDomReferences();
@@ -1920,7 +1920,7 @@ export class ProjectShowcase {
 
         <!-- Screenshot Header Banner with CRT Scanlines -->
         <div class="card-screenshot-banner">
-          ${screenshotUrl ? `<img src="${screenshotUrl}" alt="${proj.name} Interface Screenshot" loading="lazy" class="card-img" />` : `<div class="card-img-placeholder">NO VISUAL TELEMETRY</div>`}
+          ${screenshotUrl ? `<img src="${screenshotUrl}" alt="${proj.name} Interface Screenshot" loading="lazy" decoding="async" class="card-img" />` : `<div class="card-img-placeholder">NO VISUAL TELEMETRY</div>`}
           <div class="card-scanlines" aria-hidden="true"></div>
           <button class="quick-inspect-trigger" aria-label="Inspect project">⛶ INSPECT</button>
         </div>
@@ -2071,7 +2071,7 @@ export class ProjectShowcase {
               <div class="screenshot-item-card">
                 <div class="screenshot-stage-frame" data-gallery-index="${idx}">
                   <div class="screenshot-glare" aria-hidden="true"></div>
-                  <img src="${s.url}" alt="${project.name} Screenshot ${idx + 1}" class="inspector-img" loading="lazy" />
+                  <img src="${s.url}" alt="${project.name} Screenshot ${idx + 1}" class="inspector-img" loading="lazy" decoding="async" />
                   <div class="inspector-scanlines ${this.isScanlinesActive ? 'active' : ''}" aria-hidden="true"></div>
                   <div class="frame-controls-bar">
                     <button class="frame-btn zoom-btn" data-url="${s.url}" data-caption="${s.caption || ''}" title="Open Full-Resolution Lightbox">
@@ -2395,7 +2395,7 @@ export class ProjectShowcase {
     if (this.isRunning) return;
     this.isRunning = true;
     this._forceLayoutRefresh = true;
-    this.clock.start();
+    this.timer.reset();
     this.animate();
   }
 
@@ -2412,9 +2412,10 @@ export class ProjectShowcase {
 
     this.animFrameId = requestAnimationFrame(() => this.animate());
 
-    // getDelta() updates elapsedTime internally; use .elapsedTime directly
-    const delta = Math.min(this.clock.getDelta(), 0.1);
-    const elapsedTime = this.clock.elapsedTime;
+    // Timer requires an explicit update() per frame; use getElapsed() directly
+    this.timer.update();
+    const delta = Math.min(this.timer.getDelta(), 0.1);
+    const elapsedTime = this.timer.getElapsed();
 
     // 1. Auto-rotation when not dragging and not hovering (frame-rate normalized)
     if (this.autoRotate && !this.isDragging && !this.isHovered) {

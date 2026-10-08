@@ -32,6 +32,7 @@ export class InteractionManager {
     this.lastTouchX = 0;
     this.touchStartTime = 0;
     this.isPanningSummit = false;
+    this._lastTouchHandled = 0;
 
     this.bindEvents();
   }
@@ -114,6 +115,9 @@ export class InteractionManager {
     };
 
     window.addEventListener('mousemove', (e) => {
+      // Discard synthetic mousemove events following touch interactions
+      if (Date.now() - this._lastTouchHandled < 500) return;
+
       if (isPointerOverUI(e)) {
         this.isOverUI = true;
         this.mouse.set(-999, -999);
@@ -154,11 +158,23 @@ export class InteractionManager {
 
     this.domElement.addEventListener('click', (e) => {
       if (isPointerOverUI(e)) return;
-      if (!this.hoveredTarget) return;
-      this.performTargetInteraction(this.hoveredTarget);
+      // Prevent delayed synthetic click from double-triggering recent touch tap
+      if (Date.now() - this._lastTouchHandled < 500) return;
+
+      // Prefer cached hovered target from mousemove, or raycast directly if null (tap / rapid click)
+      let target = this.hoveredTarget;
+      if (!target) {
+        const clickPoint = new THREE.Vector2(
+          (e.clientX / window.innerWidth) * 2 - 1,
+          -(e.clientY / window.innerHeight) * 2 + 1
+        );
+        target = this.findInteractiveObjectAt(clickPoint);
+      }
+      if (!target) return;
+      this.performTargetInteraction(target);
     });
 
-    // Touch Support: Tap detection for raycasting + Mobile-only Drag for Summit Panorama + Swipe for Waypoints
+    // Touch Support: Direct tap detection + Drag for Summit Panorama + Swipe for Waypoints
     this.domElement.addEventListener('touchstart', (e) => {
       if (isPointerOverUI(e)) return;
       if (e.touches.length > 0) {
@@ -179,12 +195,11 @@ export class InteractionManager {
       const totalDistY = Math.abs(clientY - this.touchStartY);
 
       // In Summit Waypoint (index 0) on mobile phones: horizontal drag pans the mountain & river panorama!
+      // Requires distinct intentional drag distance (> 18px) to prevent finger tap jitter from consuming taps
       const isMobile = this.cameraRig?.isMobileDevice ? this.cameraRig.isMobileDevice() : (window.innerWidth <= 768);
       if (isMobile && this.cameraRig && this.cameraRig.activeWaypointIndex === 0 && !this.cameraRig.isTransitioning) {
-        if (totalDistX > 6 && totalDistX > totalDistY * 0.7) {
+        if (totalDistX > 18 && totalDistX > totalDistY * 0.75) {
           this.isPanningSummit = true;
-          // Drag right pulls river onto screen from the left (+pan)
-          // Drag left pulls mountain peaks onto screen from the right (-pan)
           const sensitivity = (deltaX / window.innerWidth) * 0.95;
           this.cameraRig.panSummit(sensitivity);
           this.lastTouchX = clientX;
@@ -232,23 +247,18 @@ export class InteractionManager {
         }
       }
 
-      // 2. Clean Tap Gesture (< 16px movement) -> Raycast touch coordinates
-      if (dist < 16 && elapsed < 450) {
+      // 2. Direct Tap Gesture: Clean single tap (< 18px movement) opens target directly on mobile
+      if (dist < 18 && elapsed < 500) {
         const touchPoint = new THREE.Vector2(
           (touch.clientX / window.innerWidth) * 2 - 1,
           -(touch.clientY / window.innerHeight) * 2 + 1
         );
         const hitTarget = this.findInteractiveObjectAt(touchPoint);
         if (hitTarget) {
-          // Brief mobile visual feedback: position tooltip at tap
-          if (this.tooltipEl && this.tooltipText) {
-            this.tooltipText.textContent = hitTarget.userData.label || 'Opening...';
-            this.tooltipEl.style.left = `${touch.clientX}px`;
-            this.tooltipEl.style.top = `${touch.clientY}px`;
-            this.tooltipEl.classList.remove('hidden');
-            setTimeout(() => {
-              if (this.tooltipEl) this.tooltipEl.classList.add('hidden');
-            }, 800);
+          this._lastTouchHandled = Date.now();
+          if (this.tooltipEl) {
+            this.tooltipEl.classList.add('hidden');
+            this._tooltipHidden = true;
           }
           this.performTargetInteraction(hitTarget);
         }
