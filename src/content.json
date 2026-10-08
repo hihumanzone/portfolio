@@ -19,38 +19,38 @@
     "statusMessage": "Broadcasting from the mountain ridge. Open for engineering collaborations, dance and creative software solutions."
   },
   "navigation": {
-    "hint": "Click waypoints, 3D objects, or move mouse to tilt cinematic camera! <3",
+    "hint": "Choose a destination below, or tap a landmark to open it.",
     "waypoints": [
       {
         "id": 0,
         "code": "01",
-        "name": "SUMMIT"
+        "name": "HOME"
       },
       {
         "id": 1,
         "code": "02",
-        "name": "CABIN"
+        "name": "PROJECTS"
       },
       {
         "id": 2,
         "code": "03",
-        "name": "CAMPFIRE"
+        "name": "JOURNAL"
       },
       {
         "id": 3,
         "code": "04",
-        "name": "SIGNAL TOWER"
+        "name": "CONTACT"
       }
     ],
     "interactiveTargets": {
       "cabin": {
-        "label": "ENTER CABIN WORKSPACE 🏚️"
+        "label": "OPEN PROJECTS"
       },
       "campfire": {
-        "label": "READ CAMPFIRE JOURNAL 📖"
+        "label": "OPEN JOURNAL"
       },
       "signalTower": {
-        "label": "OPEN SIGNAL TRANSMISSION 📡"
+        "label": "OPEN CONTACTS"
       },
       "defaultTooltip": "Click to inspect"
     }
